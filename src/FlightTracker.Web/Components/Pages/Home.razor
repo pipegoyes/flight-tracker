@@ -1,0 +1,197 @@
+@page "/"
+@using FlightTracker.Core.Entities
+@using FlightTracker.Core.Services
+@rendermode InteractiveServer
+@inject FlightSearchService FlightSearchService
+@inject ConfigurationService ConfigurationService
+
+<PageTitle>Flight Tracker</PageTitle>
+
+<div class="container mt-4">
+    <h1 class="mb-4">✈️ Flight Tracker</h1>
+
+    @if (isLoading)
+    {
+        <div class="text-center">
+            <div class="spinner-border" role="status">
+                <span class="visually-hidden">Loading...</span>
+            </div>
+            <p class="mt-2">Loading flight data...</p>
+        </div>
+    }
+    else if (errorMessage != null)
+    {
+        <div class="alert alert-danger">
+            <strong>Error:</strong> @errorMessage
+        </div>
+    }
+    else
+    {
+        <!-- Date Selector -->
+        <div class="card mb-4">
+            <div class="card-body">
+                <h5 class="card-title">Select Travel Dates</h5>
+                <select class="form-select" @onchange="OnTargetDateChanged">
+                    <option value="">-- Select a date range --</option>
+                    @foreach (var date in targetDates)
+                    {
+                        <option value="@date.Id" selected="@(date.Id == selectedTargetDateId)">
+                            @date.Name (@date.OutboundDate.ToString("MMM dd") - @date.ReturnDate.ToString("MMM dd, yyyy"))
+                        </option>
+                    }
+                </select>
+            </div>
+        </div>
+
+        <!-- Flight Results -->
+        @if (selectedTargetDateId.HasValue && priceChecks.Any())
+        {
+            <h3 class="mb-3">Latest Prices</h3>
+            <div class="row">
+                @foreach (var price in priceChecks.OrderBy(p => p.Price))
+                {
+                    <div class="col-md-6 col-lg-4 mb-3">
+                        <div class="card h-100">
+                            <div class="card-body">
+                                <h5 class="card-title">@price.Destination.Name</h5>
+                                <h2 class="text-primary">€@price.Price.ToString("F0")</h2>
+                                
+                                <div class="mt-3">
+                                    <p class="mb-1">
+                                        <strong>@price.Airline</strong>
+                                        @if (price.Stops == 0)
+                                        {
+                                            <span class="badge bg-success ms-2">Direct</span>
+                                        }
+                                        else
+                                        {
+                                            <span class="badge bg-warning ms-2">@price.Stops stop@(price.Stops > 1 ? "s" : "")</span>
+                                        }
+                                    </p>
+                                    
+                                    <p class="mb-1 text-muted">
+                                        <small>
+                                            🛫 @price.DepartureTime.ToString("HH:mm") → 
+                                            🛬 @price.ArrivalTime.ToString("HH:mm")
+                                        </small>
+                                    </p>
+                                    
+                                    <p class="mb-2 text-muted">
+                                        <small>
+                                            Last checked: @GetTimeAgo(price.CheckTimestamp)
+                                        </small>
+                                    </p>
+                                </div>
+
+                                <div class="d-grid gap-2">
+                                    @if (!string.IsNullOrEmpty(price.BookingUrl))
+                                    {
+                                        <a href="@price.BookingUrl" target="_blank" class="btn btn-primary btn-sm">
+                                            Book Now →
+                                        </a>
+                                    }
+                                    <a href="/history/@price.TargetDateId/@price.DestinationId" class="btn btn-outline-secondary btn-sm">
+                                        📊 View Price History
+                                    </a>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                }
+            </div>
+        }
+        else if (selectedTargetDateId.HasValue)
+        {
+            <div class="alert alert-info">
+                <p class="mb-0">No price data available yet for this date range.</p>
+                <small>Price checks run automatically twice daily (6 AM & 6 PM).</small>
+            </div>
+        }
+        else
+        {
+            <div class="alert alert-secondary">
+                <p class="mb-0">Please select a date range to view flight prices.</p>
+            </div>
+        }
+    }
+</div>
+
+@code {
+    private List<TargetDate> targetDates = new();
+    private List<PriceCheck> priceChecks = new();
+    private int? selectedTargetDateId;
+    private bool isLoading = true;
+    private string? errorMessage;
+
+    protected override async Task OnInitializedAsync()
+    {
+        try
+        {
+            // Load target dates
+            targetDates = (await ConfigurationService.GetUpcomingTargetDatesAsync())
+                .OrderBy(t => t.OutboundDate)
+                .ToList();
+
+            // Auto-select first date if available
+            if (targetDates.Any())
+            {
+                selectedTargetDateId = targetDates.First().Id;
+                await LoadPrices();
+            }
+        }
+        catch (Exception ex)
+        {
+            errorMessage = $"Failed to load data: {ex.Message}";
+        }
+        finally
+        {
+            isLoading = false;
+        }
+    }
+
+    private async Task OnTargetDateChanged(ChangeEventArgs e)
+    {
+        if (int.TryParse(e.Value?.ToString(), out var dateId))
+        {
+            selectedTargetDateId = dateId;
+            await LoadPrices();
+        }
+        else
+        {
+            selectedTargetDateId = null;
+            priceChecks.Clear();
+        }
+    }
+
+    private async Task LoadPrices()
+    {
+        if (!selectedTargetDateId.HasValue)
+            return;
+
+        try
+        {
+            isLoading = true;
+            priceChecks = (await FlightSearchService.GetLatestPricesAsync(selectedTargetDateId.Value))
+                .ToList();
+        }
+        catch (Exception ex)
+        {
+            errorMessage = $"Failed to load prices: {ex.Message}";
+        }
+        finally
+        {
+            isLoading = false;
+        }
+    }
+
+    private string GetTimeAgo(DateTime timestamp)
+    {
+        var span = DateTime.UtcNow - timestamp;
+        
+        if (span.TotalMinutes < 60)
+            return $"{(int)span.TotalMinutes} min ago";
+        if (span.TotalHours < 24)
+            return $"{(int)span.TotalHours}h ago";
+        return $"{(int)span.TotalDays}d ago";
+    }
+}

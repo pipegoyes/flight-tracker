@@ -1,0 +1,229 @@
+@page "/history/{TargetDateId:int}/{DestinationId:int}"
+@using FlightTracker.Core.Entities
+@using FlightTracker.Core.Services
+@rendermode InteractiveServer
+@inject PriceHistoryService PriceHistoryService
+@inject NavigationManager Navigation
+
+<PageTitle>Price History</PageTitle>
+
+<div class="container mt-4">
+    <button class="btn btn-outline-secondary mb-3" @onclick="NavigateBack">
+        ← Back to Overview
+    </button>
+
+    @if (isLoading)
+    {
+        <div class="text-center">
+            <div class="spinner-border" role="status">
+                <span class="visually-hidden">Loading...</span>
+            </div>
+        </div>
+    }
+    else if (priceHistory.Any())
+    {
+        var latest = priceHistory.Last();
+        var oldest = priceHistory.First();
+        var lowest = priceHistory.MinBy(p => p.Price);
+        var average = priceHistory.Average(p => p.Price);
+        var priceChange = latest.Price - oldest.Price;
+        var percentChange = (priceChange / oldest.Price) * 100;
+
+        <h2>@latest.Destination.Name</h2>
+        <h5 class="text-muted">@latest.TargetDate.Name</h5>
+
+        <!-- Stats Cards -->
+        <div class="row mt-4 mb-4">
+            <div class="col-md-3">
+                <div class="card">
+                    <div class="card-body">
+                        <h6 class="card-subtitle mb-2 text-muted">Current Price</h6>
+                        <h3 class="card-title">€@latest.Price.ToString("F0")</h3>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-3">
+                <div class="card">
+                    <div class="card-body">
+                        <h6 class="card-subtitle mb-2 text-muted">7-Day Change</h6>
+                        <h3 class="card-title" style="color: @(priceChange > 0 ? "#dc3545" : "#28a745")">
+                            @(priceChange > 0 ? "+" : "")€@priceChange.ToString("F0")
+                            <small>(@(percentChange > 0 ? "+" : "")@percentChange.ToString("F1")%)</small>
+                        </h3>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-3">
+                <div class="card">
+                    <div class="card-body">
+                        <h6 class="card-subtitle mb-2 text-muted">Lowest Price</h6>
+                        <h3 class="card-title text-success">€@lowest!.Price.ToString("F0")</h3>
+                        <small class="text-muted">@lowest.CheckTimestamp.ToString("MMM dd")</small>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-3">
+                <div class="card">
+                    <div class="card-body">
+                        <h6 class="card-subtitle mb-2 text-muted">Average Price</h6>
+                        <h3 class="card-title">€@average.ToString("F0")</h3>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Chart -->
+        <div class="card">
+            <div class="card-body">
+                <h5 class="card-title">Price Evolution (Last 7 Days)</h5>
+                <canvas id="priceChart" style="max-height: 400px;"></canvas>
+            </div>
+        </div>
+
+        <!-- Price History Table -->
+        <div class="card mt-4">
+            <div class="card-body">
+                <h5 class="card-title">Detailed History</h5>
+                <div class="table-responsive">
+                    <table class="table table-sm">
+                        <thead>
+                            <tr>
+                                <th>Date</th>
+                                <th>Time</th>
+                                <th>Price</th>
+                                <th>Airline</th>
+                                <th>Flight</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            @foreach (var check in priceHistory.OrderByDescending(p => p.CheckTimestamp))
+                            {
+                                <tr>
+                                    <td>@check.CheckTimestamp.ToString("MMM dd, yyyy")</td>
+                                    <td>@check.CheckTimestamp.ToString("HH:mm")</td>
+                                    <td><strong>€@check.Price.ToString("F2")</strong></td>
+                                    <td>@check.Airline</td>
+                                    <td>
+                                        @check.DepartureTime.ToString("HH:mm") → @check.ArrivalTime.ToString("HH:mm")
+                                        @if (check.Stops == 0)
+                                        {
+                                            <span class="badge bg-success ms-1">Direct</span>
+                                        }
+                                        else
+                                        {
+                                            <span class="badge bg-warning ms-1">@check.Stops stop@(check.Stops > 1 ? "s" : "")</span>
+                                        }
+                                    </td>
+                                </tr>
+                            }
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    }
+    else
+    {
+        <div class="alert alert-info">
+            No price history available for this route.
+        </div>
+    }
+</div>
+
+@code {
+    [Parameter]
+    public int TargetDateId { get; set; }
+
+    [Parameter]
+    public int DestinationId { get; set; }
+
+    private List<PriceCheck> priceHistory = new();
+    private bool isLoading = true;
+
+    protected override async Task OnInitializedAsync()
+    {
+        try
+        {
+            priceHistory = (await PriceHistoryService.GetPriceHistoryAsync(
+                TargetDateId,
+                DestinationId,
+                daysBack: 30))
+                .OrderBy(p => p.CheckTimestamp)
+                .ToList();
+        }
+        finally
+        {
+            isLoading = false;
+        }
+    }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender && priceHistory.Any())
+        {
+            await RenderChartAsync();
+        }
+    }
+
+    private async Task RenderChartAsync()
+    {
+        var labels = priceHistory.Select(p => p.CheckTimestamp.ToString("MMM dd HH:mm")).ToArray();
+        var prices = priceHistory.Select(p => (double)p.Price).ToArray();
+
+        var labelsJson = System.Text.Json.JsonSerializer.Serialize(labels);
+        var pricesJson = System.Text.Json.JsonSerializer.Serialize(prices);
+
+        var script = $@"
+            const ctx = document.getElementById('priceChart');
+            if (ctx && window.Chart) {{
+                new Chart(ctx, {{
+                    type: 'line',
+                    data: {{
+                        labels: {labelsJson},
+                        datasets: [{{
+                            label: 'Price (EUR)',
+                            data: {pricesJson},
+                            borderColor: '#0d6efd',
+                            backgroundColor: 'rgba(13, 110, 253, 0.1)',
+                            tension: 0.1,
+                            fill: true
+                        }}]
+                    }},
+                    options: {{
+                        responsive: true,
+                        maintainAspectRatio: true,
+                        plugins: {{
+                            legend: {{
+                                display: false
+                            }},
+                            tooltip: {{
+                                mode: 'index',
+                                intersect: false
+                            }}
+                        }},
+                        scales: {{
+                            y: {{
+                                beginAtZero: false,
+                                ticks: {{
+                                    callback: function(value) {{
+                                        return '€' + value;
+                                    }}
+                                }}
+                            }}
+                        }}
+                    }}
+                }});
+            }}
+        ";
+
+        await JS.InvokeVoidAsync("eval", script);
+    }
+
+    private void NavigateBack()
+    {
+        Navigation.NavigateTo("/");
+    }
+
+    [Inject]
+    private IJSRuntime JS { get; set; } = default!;
+}

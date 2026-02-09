@@ -1,0 +1,24 @@
+version: '3.8'
+
+services:
+  flighttracker:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: flight-tracker
+    ports:
+      - "8080:8080"
+    volumes:
+      - ./data:/app/data
+      - ./appsettings.Production.json:/app/appsettings.Production.json:ro
+    environment:
+      - ASPNETCORE_ENVIRONMENT=Production
+      - ASPNETCORE_URLS=http://+:8080
+      - ConnectionStrings__FlightTracker=Data Source=/app/data/flighttracker.db
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8080/"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s

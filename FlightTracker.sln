@@ -1,0 +1,64 @@
+﻿
+Microsoft Visual Studio Solution File, Format Version 12.00
+# Visual Studio Version 17
+VisualStudioVersion = 17.0.31903.59
+MinimumVisualStudioVersion = 10.0.40219.1
+Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "src", "src", "{838BCEA9-45BC-419B-9AEA-1B043C419455}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "FlightTracker.Core", "src\FlightTracker.Core\FlightTracker.Core.csproj", "{3BDCBB85-7DB6-436E-8983-AE12A99B69FC}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "FlightTracker.Data", "src\FlightTracker.Data\FlightTracker.Data.csproj", "{3D26BFF7-BA6F-4515-956D-082F84F7CA8E}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "FlightTracker.Providers", "src\FlightTracker.Providers\FlightTracker.Providers.csproj", "{AC49A986-55E6-42AC-80F5-BD1F7D453860}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "FlightTracker.Web", "src\FlightTracker.Web\FlightTracker.Web.csproj", "{8A25911B-B686-433E-AC66-B0E5A3DE761E}"
+EndProject
+Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "tests", "tests", "{1D41E358-CB8A-4038-A529-2467130CD355}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "FlightTracker.Tests", "tests\FlightTracker.Tests\FlightTracker.Tests.csproj", "{3E983681-34B3-40B3-95CA-61B79758B90C}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "FlightTracker.IntegrationTests", "tests\FlightTracker.IntegrationTests\FlightTracker.IntegrationTests.csproj", "{5B8B0E88-B3D0-4378-B25F-DCC6182826F1}"
+EndProject
+Global
+	GlobalSection(SolutionConfigurationPlatforms) = preSolution
+		Debug|Any CPU = Debug|Any CPU
+		Release|Any CPU = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(SolutionProperties) = preSolution
+		HideSolutionNode = FALSE
+	EndGlobalSection
+	GlobalSection(ProjectConfigurationPlatforms) = postSolution
+		{3BDCBB85-7DB6-436E-8983-AE12A99B69FC}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{3BDCBB85-7DB6-436E-8983-AE12A99B69FC}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{3BDCBB85-7DB6-436E-8983-AE12A99B69FC}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{3BDCBB85-7DB6-436E-8983-AE12A99B69FC}.Release|Any CPU.Build.0 = Release|Any CPU
+		{3D26BFF7-BA6F-4515-956D-082F84F7CA8E}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{3D26BFF7-BA6F-4515-956D-082F84F7CA8E}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{3D26BFF7-BA6F-4515-956D-082F84F7CA8E}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{3D26BFF7-BA6F-4515-956D-082F84F7CA8E}.Release|Any CPU.Build.0 = Release|Any CPU
+		{AC49A986-55E6-42AC-80F5-BD1F7D453860}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{AC49A986-55E6-42AC-80F5-BD1F7D453860}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{AC49A986-55E6-42AC-80F5-BD1F7D453860}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{AC49A986-55E6-42AC-80F5-BD1F7D453860}.Release|Any CPU.Build.0 = Release|Any CPU
+		{8A25911B-B686-433E-AC66-B0E5A3DE761E}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{8A25911B-B686-433E-AC66-B0E5A3DE761E}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{8A25911B-B686-433E-AC66-B0E5A3DE761E}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{8A25911B-B686-433E-AC66-B0E5A3DE761E}.Release|Any CPU.Build.0 = Release|Any CPU
+		{3E983681-34B3-40B3-95CA-61B79758B90C}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{3E983681-34B3-40B3-95CA-61B79758B90C}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{3E983681-34B3-40B3-95CA-61B79758B90C}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{3E983681-34B3-40B3-95CA-61B79758B90C}.Release|Any CPU.Build.0 = Release|Any CPU
+		{5B8B0E88-B3D0-4378-B25F-DCC6182826F1}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{5B8B0E88-B3D0-4378-B25F-DCC6182826F1}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{5B8B0E88-B3D0-4378-B25F-DCC6182826F1}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{5B8B0E88-B3D0-4378-B25F-DCC6182826F1}.Release|Any CPU.Build.0 = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(NestedProjects) = preSolution
+		{3BDCBB85-7DB6-436E-8983-AE12A99B69FC} = {838BCEA9-45BC-419B-9AEA-1B043C419455}
+		{3D26BFF7-BA6F-4515-956D-082F84F7CA8E} = {838BCEA9-45BC-419B-9AEA-1B043C419455}
+		{AC49A986-55E6-42AC-80F5-BD1F7D453860} = {838BCEA9-45BC-419B-9AEA-1B043C419455}
+		{8A25911B-B686-433E-AC66-B0E5A3DE761E} = {838BCEA9-45BC-419B-9AEA-1B043C419455}
+		{3E983681-34B3-40B3-95CA-61B79758B90C} = {1D41E358-CB8A-4038-A529-2467130CD355}
+		{5B8B0E88-B3D0-4378-B25F-DCC6182826F1} = {1D41E358-CB8A-4038-A529-2467130CD355}
+	EndGlobalSection
+EndGlobal
