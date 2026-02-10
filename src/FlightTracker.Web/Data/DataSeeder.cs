@@ -17,6 +17,9 @@ public static class DataSeeder
             return; // Nothing to seed
         }
 
+        // Ensure all target dates have destination associations
+        await SeedTargetDateDestinationsAsync(context, destinations, targetDates);
+
         // Seed data for the past 7 days (twice per day = 14 checks)
         var now = DateTime.UtcNow;
         var random = new Random(42); // Fixed seed for consistent test data
@@ -32,6 +35,35 @@ public static class DataSeeder
             {
                 await SeedPriceCheck(context, destinations, targetDates, 
                     now.AddDays(-daysAgo).Date.AddHours(18), random);
+            }
+        }
+
+        await context.SaveChangesAsync();
+    }
+
+    private static async Task SeedTargetDateDestinationsAsync(
+        FlightTrackerDbContext context,
+        List<Destination> destinations,
+        List<TargetDate> targetDates)
+    {
+        foreach (var targetDate in targetDates)
+        {
+            foreach (var destination in destinations)
+            {
+                // Check if association already exists
+                var exists = await context.TargetDateDestinations.AnyAsync(tdd =>
+                    tdd.TargetDateId == targetDate.Id &&
+                    tdd.DestinationId == destination.Id);
+
+                if (!exists)
+                {
+                    context.TargetDateDestinations.Add(new TargetDateDestination
+                    {
+                        TargetDateId = targetDate.Id,
+                        DestinationId = destination.Id,
+                        CreatedAt = DateTime.UtcNow
+                    });
+                }
             }
         }
 

@@ -52,35 +52,51 @@
 
             <div class="mb-3">
                 <label class="form-label fw-bold">Destinations</label>
-                <div class="autocomplete-container position-relative">
+                
+                <div class="mb-2">
                     <input type="text" 
                            class="form-control" 
-                           placeholder="🔍 Search airport (e.g., PMI, Mallorca)..."
-                           @bind="searchQuery"
-                           @bind:event="oninput"
-                           @onfocus="OnSearchFocus"
-                           @onblur="OnSearchBlur" />
-                    
-                    @if (showAutocomplete && filteredDestinations.Any())
-                    {
-                        <div class="autocomplete-dropdown">
-                            @foreach (var dest in filteredDestinations)
+                           placeholder="🔍 Filter airports..."
+                           @oninput="OnSearchChange"
+                           value="@searchQuery" />
+                </div>
+
+                <div class="destinations-table">
+                    <table class="table table-sm table-hover">
+                        <thead>
+                            <tr>
+                                <th style="width: 50px;"></th>
+                                <th>Code</th>
+                                <th>Airport Name</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            @foreach (var dest in GetFilteredDestinations())
                             {
-                                <div class="autocomplete-item" @onmousedown="@(() => AddDestination(dest))">
-                                    <strong>@dest.AirportCode</strong> - @dest.Name
-                                </div>
+                                var isSelected = selectedDestinations.Any(d => d.Id == dest.Id);
+                                <tr style="cursor: pointer;" @onclick="@(() => ToggleDestination(dest))">
+                                    <td class="text-center">
+                                        <input type="checkbox" 
+                                               checked="@isSelected"
+                                               @onclick:stopPropagation="true"
+                                               @onchange="@(() => ToggleDestination(dest))" />
+                                    </td>
+                                    <td><strong>@dest.AirportCode</strong></td>
+                                    <td>@dest.Name</td>
+                                </tr>
                             }
-                        </div>
-                    }
+                        </tbody>
+                    </table>
                 </div>
 
                 @if (selectedDestinations.Any())
                 {
                     <div class="destination-chips mt-2">
+                        <small class="text-muted me-2">Selected (@selectedDestinations.Count):</small>
                         @foreach (var dest in selectedDestinations)
                         {
                             <span class="badge bg-primary">
-                                @dest.AirportCode - @dest.Name
+                                @dest.AirportCode
                                 <button type="button" class="btn-close-chip" @onclick="@(() => RemoveDestination(dest.Id))">×</button>
                             </span>
                         }
@@ -88,8 +104,8 @@
                 }
                 else
                 {
-                    <small class="text-muted d-block mt-2">
-                        <i class="bi bi-info-circle"></i> Please select at least one destination
+                    <small class="text-danger d-block mt-2">
+                        <i class="bi bi-exclamation-triangle"></i> Please select at least one destination
                     </small>
                 }
             </div>
@@ -224,14 +240,15 @@
         display: flex;
         flex-wrap: wrap;
         gap: 0.5rem;
+        align-items: center;
     }
 
     .destination-chips .badge {
-        font-size: 0.9rem;
-        padding: 0.5rem 0.75rem;
-        display: flex;
+        font-size: 0.85rem;
+        padding: 0.4rem 0.6rem;
+        display: inline-flex;
         align-items: center;
-        gap: 0.5rem;
+        gap: 0.4rem;
     }
 
     .btn-close-chip {
@@ -239,47 +256,37 @@
         border: none;
         color: white;
         cursor: pointer;
-        font-size: 1.2rem;
+        font-size: 1.1rem;
         line-height: 1;
         padding: 0;
-        margin-left: 0.25rem;
+        margin-left: 0.15rem;
     }
 
     .btn-close-chip:hover {
         opacity: 0.8;
     }
 
-    .autocomplete-container {
-        position: relative;
-    }
-
-    .autocomplete-dropdown {
-        position: absolute;
-        top: 100%;
-        left: 0;
-        right: 0;
-        background: white;
-        border: 1px solid #ced4da;
-        border-top: none;
-        border-radius: 0 0 0.375rem 0.375rem;
+    .destinations-table {
         max-height: 300px;
         overflow-y: auto;
-        z-index: 1000;
-        box-shadow: 0 0.5rem 1rem rgba(0, 0, 0, 0.15);
+        border: 1px solid #dee2e6;
+        border-radius: 0.375rem;
     }
 
-    .autocomplete-item {
-        padding: 0.75rem 1rem;
-        cursor: pointer;
-        border-bottom: 1px solid #f0f0f0;
+    .destinations-table table {
+        margin-bottom: 0;
     }
 
-    .autocomplete-item:hover {
+    .destinations-table thead th {
+        position: sticky;
+        top: 0;
         background: #f8f9fa;
+        z-index: 10;
+        border-bottom: 2px solid #dee2e6;
     }
 
-    .autocomplete-item:last-child {
-        border-bottom: none;
+    .destinations-table tbody tr:hover {
+        background-color: #f8f9fa;
     }
 </style>
 
@@ -296,12 +303,10 @@
     
     private TargetDateModel newDate = new();
     
-    // Destination autocomplete
+    // Destination selection
     private List<Destination> allDestinations = new();
     private List<Destination> selectedDestinations = new();
-    private List<Destination> filteredDestinations = new();
     private string searchQuery = "";
-    private bool showAutocomplete = false;
 
     protected override async Task OnInitializedAsync()
     {
@@ -457,60 +462,40 @@
         showDeleted = true;
     }
 
-    // Autocomplete methods
-    private void OnSearchFocus()
+    // Destination selection methods
+    private void OnSearchChange(ChangeEventArgs e)
     {
-        if (!string.IsNullOrWhiteSpace(searchQuery))
-        {
-            FilterDestinations();
-            showAutocomplete = true;
-        }
+        searchQuery = e.Value?.ToString() ?? "";
+        StateHasChanged();
     }
 
-    private async Task OnSearchBlur()
+    private List<Destination> GetFilteredDestinations()
     {
-        // Delay to allow click event on dropdown items to fire
-        await Task.Delay(200);
-        showAutocomplete = false;
-    }
-
-    private string _lastSearchQuery = "";
-    
-    private void FilterDestinations()
-    {
-        if (searchQuery == _lastSearchQuery)
-            return;
-            
-        _lastSearchQuery = searchQuery;
-        
         if (string.IsNullOrWhiteSpace(searchQuery))
         {
-            filteredDestinations.Clear();
-            showAutocomplete = false;
-            return;
+            return allDestinations;
         }
 
-        filteredDestinations = allDestinations
-            .Where(d => !selectedDestinations.Any(s => s.Id == d.Id))
+        return allDestinations
             .Where(d => 
                 d.AirportCode.Contains(searchQuery, StringComparison.OrdinalIgnoreCase) ||
                 d.Name.Contains(searchQuery, StringComparison.OrdinalIgnoreCase))
-            .Take(10)
             .ToList();
-
-        showAutocomplete = filteredDestinations.Any();
     }
 
-    private void AddDestination(Destination dest)
+    private void ToggleDestination(Destination dest)
     {
-        if (!selectedDestinations.Any(d => d.Id == dest.Id))
+        var existing = selectedDestinations.FirstOrDefault(d => d.Id == dest.Id);
+        
+        if (existing != null)
+        {
+            selectedDestinations.Remove(existing);
+        }
+        else
         {
             selectedDestinations.Add(dest);
         }
-        searchQuery = "";
-        _lastSearchQuery = "";
-        filteredDestinations.Clear();
-        showAutocomplete = false;
+        
         StateHasChanged();
     }
 
