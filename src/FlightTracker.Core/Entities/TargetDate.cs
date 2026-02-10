@@ -26,6 +26,26 @@ public class TargetDate
     public string Name { get; set; } = string.Empty;
 
     /// <summary>
+    /// Soft delete flag - if true, this date is hidden from active tracking.
+    /// </summary>
+    public bool IsDeleted { get; set; } = false;
+
+    /// <summary>
+    /// Timestamp when this date was soft-deleted.
+    /// </summary>
+    public DateTime? DeletedAt { get; set; }
+
+    /// <summary>
+    /// Timestamp when this record was created.
+    /// </summary>
+    public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
+
+    /// <summary>
+    /// Timestamp when this record was last updated.
+    /// </summary>
+    public DateTime? UpdatedAt { get; set; }
+
+    /// <summary>
     /// Navigation property to price checks for this date range.
     /// </summary>
     public ICollection<PriceCheck> PriceChecks { get; set; } = new List<PriceCheck>();
