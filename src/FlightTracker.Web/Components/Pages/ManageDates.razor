@@ -1,0 +1,302 @@
+@page "/manage-dates"
+@rendermode InteractiveServer
+@using FlightTracker.Core.Entities
+@using FlightTracker.Core.Interfaces
+@inject ITargetDateRepository TargetDateRepository
+@inject NavigationManager Navigation
+
+<PageTitle>Manage Travel Dates</PageTitle>
+
+<h1>✈️ Manage Travel Dates</h1>
+
+<div class="row mb-4">
+    <div class="col">
+        <button class="btn btn-primary" @onclick="ShowAddForm">
+            <i class="bi bi-plus-circle"></i> Add New Date
+        </button>
+        
+        <button class="btn btn-outline-secondary ms-2" @onclick="ShowDeletedDates">
+            <i class="bi bi-trash"></i> View Deleted (@deletedCount)
+        </button>
+    </div>
+</div>
+
+@if (showAddForm)
+{
+    <div class="card mb-4 border-primary">
+        <div class="card-header bg-primary text-white">
+            <h5 class="mb-0">@(editingDate == null ? "Add" : "Edit") Travel Date</h5>
+        </div>
+        <div class="card-body">
+            <div class="mb-3">
+                <label class="form-label fw-bold">Name</label>
+                <input type="text" @bind="newDate.Name" class="form-control" 
+                       placeholder="e.g., Easter Weekend" />
+            </div>
+
+            <div class="row">
+                <div class="col-md-6 mb-3">
+                    <label class="form-label fw-bold">Outbound Date</label>
+                    <input type="date" class="form-control" 
+                           value="@newDate.OutboundDate.ToString("yyyy-MM-dd")"
+                           @onchange="@((ChangeEventArgs e) => newDate.OutboundDate = DateTime.Parse(e.Value?.ToString() ?? DateTime.Today.ToString()))" />
+                </div>
+                <div class="col-md-6 mb-3">
+                    <label class="form-label fw-bold">Return Date</label>
+                    <input type="date" class="form-control" 
+                           value="@newDate.ReturnDate.ToString("yyyy-MM-dd")"
+                           @onchange="@((ChangeEventArgs e) => newDate.ReturnDate = DateTime.Parse(e.Value?.ToString() ?? DateTime.Today.ToString()))" />
+                </div>
+            </div>
+
+            @if (!string.IsNullOrEmpty(validationMessage))
+            {
+                <div class="alert alert-warning">
+                    @validationMessage
+                </div>
+            }
+
+            <div class="d-flex gap-2">
+                <button type="button" class="btn btn-success" @onclick="SaveDate">
+                    <i class="bi bi-check-circle"></i> Save
+                </button>
+                <button type="button" class="btn btn-secondary" @onclick="CancelEdit">
+                    Cancel
+                </button>
+            </div>
+        </div>
+    </div>
+}
+
+<div class="row">
+    @if (showDeleted)
+    {
+        <div class="col-12">
+            <h3>🗑️ Deleted Travel Dates</h3>
+            @if (deletedDates.Any())
+            {
+                <div class="alert alert-info">
+                    <i class="bi bi-info-circle"></i> These dates are hidden from tracking. Restore to resume price checks.
+                </div>
+                
+                @foreach (var date in deletedDates)
+                {
+                    <div class="card mb-2 border-danger">
+                        <div class="card-body">
+                            <div class="d-flex justify-content-between align-items-center">
+                                <div>
+                                    <h5 class="card-title mb-1">@date.Name</h5>
+                                    <div>
+                                        <small class="text-muted">
+                                            @date.OutboundDate.ToString("yyyy-MM-dd") → @date.ReturnDate.ToString("yyyy-MM-dd")
+                                            (@((date.ReturnDate - date.OutboundDate).Days) days)
+                                        </small>
+                                    </div>
+                                    <div>
+                                        <small class="text-danger">
+                                            <i class="bi bi-trash"></i> Deleted: @date.DeletedAt?.ToString("yyyy-MM-dd HH:mm")
+                                        </small>
+                                    </div>
+                                </div>
+                                <button class="btn btn-sm btn-success" @onclick="() => RestoreDate(date.Id)">
+                                    <i class="bi bi-arrow-counterclockwise"></i> Restore
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                }
+            }
+            else
+            {
+                <p class="text-muted">No deleted dates.</p>
+            }
+            
+            <button class="btn btn-secondary mt-3" @onclick="() => { showDeleted = false; StateHasChanged(); }">
+                <i class="bi bi-arrow-left"></i> Back to Active Dates
+            </button>
+        </div>
+    }
+    else
+    {
+        <div class="col-12">
+            <h3>📅 Active Travel Dates</h3>
+            
+            @if (activeDates.Any())
+            {
+                @foreach (var date in activeDates)
+                {
+                    <div class="card mb-2">
+                        <div class="card-body">
+                            <div class="d-flex justify-content-between align-items-center">
+                                <div>
+                                    <h5 class="card-title mb-1">@date.Name</h5>
+                                    <div>
+                                        <small class="text-muted">
+                                            @date.OutboundDate.ToString("yyyy-MM-dd") → @date.ReturnDate.ToString("yyyy-MM-dd")
+                                            (@((date.ReturnDate - date.OutboundDate).Days) days)
+                                        </small>
+                                    </div>
+                                </div>
+                                <div class="d-flex gap-2">
+                                    <button class="btn btn-sm btn-outline-primary" 
+                                            @onclick="() => EditDate(date)">
+                                        <i class="bi bi-pencil"></i> Edit
+                                    </button>
+                                    <button class="btn btn-sm btn-outline-danger" 
+                                            @onclick="() => DeleteDate(date.Id)">
+                                        <i class="bi bi-trash"></i> Delete
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                }
+            }
+            else
+            {
+                <div class="alert alert-warning">
+                    <i class="bi bi-exclamation-triangle"></i> No active travel dates. Add one to start tracking prices!
+                </div>
+            }
+        </div>
+    }
+</div>
+
+@code {
+    private List<TargetDate> activeDates = new();
+    private List<TargetDate> deletedDates = new();
+    private int deletedCount = 0;
+    
+    private bool showAddForm = false;
+    private bool showDeleted = false;
+    private TargetDate? editingDate = null;
+    private string validationMessage = string.Empty;
+    
+    private TargetDateModel newDate = new();
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadDates();
+    }
+
+    private async Task LoadDates()
+    {
+        activeDates = (await TargetDateRepository.GetAllAsync()).OrderBy(d => d.OutboundDate).ToList();
+        deletedDates = (await TargetDateRepository.GetDeletedAsync()).ToList();
+        deletedCount = deletedDates.Count;
+        StateHasChanged();
+    }
+
+    private void ShowAddForm()
+    {
+        editingDate = null;
+        newDate = new TargetDateModel
+        {
+            OutboundDate = DateTime.Today.AddMonths(1),
+            ReturnDate = DateTime.Today.AddMonths(1).AddDays(3)
+        };
+        validationMessage = string.Empty;
+        showAddForm = true;
+    }
+
+    private void EditDate(TargetDate date)
+    {
+        editingDate = date;
+        newDate = new TargetDateModel
+        {
+            Name = date.Name,
+            OutboundDate = date.OutboundDate,
+            ReturnDate = date.ReturnDate
+        };
+        validationMessage = string.Empty;
+        showAddForm = true;
+    }
+
+    private void CancelEdit()
+    {
+        showAddForm = false;
+        editingDate = null;
+        validationMessage = string.Empty;
+    }
+
+    private async Task SaveDate()
+    {
+        validationMessage = string.Empty;
+
+        // Validation
+        if (string.IsNullOrWhiteSpace(newDate.Name))
+        {
+            validationMessage = "Please enter a name for this date range.";
+            return;
+        }
+
+        if (newDate.ReturnDate <= newDate.OutboundDate)
+        {
+            validationMessage = "Return date must be after outbound date.";
+            return;
+        }
+
+        try
+        {
+            if (editingDate == null)
+            {
+                // Create new
+                var targetDate = new TargetDate
+                {
+                    Name = newDate.Name,
+                    OutboundDate = newDate.OutboundDate,
+                    ReturnDate = newDate.ReturnDate
+                };
+
+                await TargetDateRepository.CreateTargetDateAsync(targetDate);
+            }
+            else
+            {
+                // Update existing
+                editingDate.Name = newDate.Name;
+                editingDate.OutboundDate = newDate.OutboundDate;
+                editingDate.ReturnDate = newDate.ReturnDate;
+
+                await TargetDateRepository.UpdateTargetDateAsync(editingDate);
+            }
+
+            showAddForm = false;
+            editingDate = null;
+            await LoadDates();
+        }
+        catch (Exception ex)
+        {
+            validationMessage = $"Error saving date: {ex.Message}";
+        }
+    }
+
+    private async Task DeleteDate(int id)
+    {
+        if (await TargetDateRepository.SoftDeleteAsync(id))
+        {
+            await LoadDates();
+        }
+    }
+
+    private async Task RestoreDate(int id)
+    {
+        if (await TargetDateRepository.RestoreAsync(id))
+        {
+            await LoadDates();
+            showDeleted = false;
+        }
+    }
+
+    private void ShowDeletedDates()
+    {
+        showDeleted = true;
+    }
+
+    // Model for form binding
+    private class TargetDateModel
+    {
+        public string Name { get; set; } = string.Empty;
+        public DateTime OutboundDate { get; set; }
+        public DateTime ReturnDate { get; set; }
+    }
+}
