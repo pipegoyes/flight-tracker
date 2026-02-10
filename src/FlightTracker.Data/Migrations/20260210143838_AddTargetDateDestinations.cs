@@ -48,19 +48,6 @@ namespace FlightTracker.Data.Migrations
                 table: "TargetDateDestinations",
                 columns: new[] { "TargetDateId", "DestinationId" },
                 unique: true);
-
-            // Seed existing data: associate all existing target dates with all destinations
-            // This preserves current behavior where all dates track all destinations
-            migrationBuilder.Sql(@"
-                INSERT INTO TargetDateDestinations (TargetDateId, DestinationId, CreatedAt)
-                SELECT t.Id, d.Id, datetime('now')
-                FROM TargetDates t
-                CROSS JOIN Destinations d
-                WHERE NOT EXISTS (
-                    SELECT 1 FROM TargetDateDestinations tdd 
-                    WHERE tdd.TargetDateId = t.Id AND tdd.DestinationId = d.Id
-                );
-            ");
         }
 
         /// <inheritdoc />

@@ -41,13 +41,27 @@
                     <label class="form-label fw-bold">Outbound Date</label>
                     <input type="date" class="form-control" 
                            value="@newDate.OutboundDate.ToString("yyyy-MM-dd")"
+                           min="@DateTime.Today.ToString("yyyy-MM-dd")"
+                           max="@DateTime.Today.AddYears(2).ToString("yyyy-MM-dd")"
+                           required
                            @onchange="OnOutboundDateChange" />
+                    @if (!string.IsNullOrEmpty(outboundDateError))
+                    {
+                        <small class="text-danger">@outboundDateError</small>
+                    }
                 </div>
                 <div class="col-md-6 mb-3">
                     <label class="form-label fw-bold">Return Date</label>
                     <input type="date" class="form-control" 
                            value="@newDate.ReturnDate.ToString("yyyy-MM-dd")"
+                           min="@DateTime.Today.ToString("yyyy-MM-dd")"
+                           max="@DateTime.Today.AddYears(2).ToString("yyyy-MM-dd")"
+                           required
                            @onchange="OnReturnDateChange" />
+                    @if (!string.IsNullOrEmpty(returnDateError))
+                    {
+                        <small class="text-danger">@returnDateError</small>
+                    }
                 </div>
             </div>
 
@@ -321,6 +335,8 @@
     private bool showDeleted = false;
     private TargetDate? editingDate = null;
     private string validationMessage = string.Empty;
+    private string outboundDateError = string.Empty;
+    private string returnDateError = string.Empty;
     
     private TargetDateModel newDate = new();
     
@@ -370,6 +386,8 @@
         filteredAirports.Clear();
         showDropdown = false;
         validationMessage = string.Empty;
+        outboundDateError = string.Empty;
+        returnDateError = string.Empty;
         showAddForm = true;
     }
 
@@ -391,6 +409,8 @@
         filteredAirports.Clear();
         showDropdown = false;
         validationMessage = string.Empty;
+        outboundDateError = string.Empty;
+        returnDateError = string.Empty;
         showAddForm = true;
     }
 
@@ -403,6 +423,8 @@
         filteredAirports.Clear();
         showDropdown = false;
         validationMessage = string.Empty;
+        outboundDateError = string.Empty;
+        returnDateError = string.Empty;
     }
 
     private async Task SaveDate()
@@ -498,19 +520,73 @@
     // Date change handlers with safe parsing
     private void OnOutboundDateChange(ChangeEventArgs e)
     {
+        outboundDateError = string.Empty;
         var value = e.Value?.ToString();
-        if (!string.IsNullOrWhiteSpace(value) && DateTime.TryParse(value, out var date))
+        
+        if (string.IsNullOrWhiteSpace(value))
         {
+            outboundDateError = "Outbound date is required";
+            return;
+        }
+        
+        if (DateTime.TryParse(value, out var date))
+        {
+            if (date < DateTime.Today)
+            {
+                outboundDateError = "Outbound date cannot be in the past";
+                return;
+            }
+            
+            if (date > DateTime.Today.AddYears(2))
+            {
+                outboundDateError = "Outbound date cannot be more than 2 years in the future";
+                return;
+            }
+            
             newDate.OutboundDate = date;
+        }
+        else
+        {
+            outboundDateError = "Invalid date format";
         }
     }
 
     private void OnReturnDateChange(ChangeEventArgs e)
     {
+        returnDateError = string.Empty;
         var value = e.Value?.ToString();
-        if (!string.IsNullOrWhiteSpace(value) && DateTime.TryParse(value, out var date))
+        
+        if (string.IsNullOrWhiteSpace(value))
         {
+            returnDateError = "Return date is required";
+            return;
+        }
+        
+        if (DateTime.TryParse(value, out var date))
+        {
+            if (date < DateTime.Today)
+            {
+                returnDateError = "Return date cannot be in the past";
+                return;
+            }
+            
+            if (date > DateTime.Today.AddYears(2))
+            {
+                returnDateError = "Return date cannot be more than 2 years in the future";
+                return;
+            }
+            
+            if (date <= newDate.OutboundDate)
+            {
+                returnDateError = "Return date must be after outbound date";
+                return;
+            }
+            
             newDate.ReturnDate = date;
+        }
+        else
+        {
+            returnDateError = "Invalid date format";
         }
     }
 

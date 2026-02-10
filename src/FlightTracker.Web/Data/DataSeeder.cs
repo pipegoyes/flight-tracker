@@ -75,9 +75,42 @@ public static class DataSeeder
         List<Destination> destinations,
         List<TargetDate> targetDates)
     {
+        var random = new Random(42); // Fixed seed for consistent test data
+        
+        // Prefer popular destinations if available
+        var preferredCodes = new[] { "PMI", "BCN", "AGP", "ALC", "TFS", "LPA", "FAO", "OPO", "LIS", "VLC" };
+        var preferredDestinations = destinations
+            .Where(d => preferredCodes.Contains(d.AirportCode))
+            .ToList();
+        
+        var fallbackDestinations = destinations
+            .Where(d => !preferredCodes.Contains(d.AirportCode))
+            .ToList();
+
         foreach (var targetDate in targetDates)
         {
-            foreach (var destination in destinations)
+            // Check existing associations
+            var existingCount = await context.TargetDateDestinations
+                .CountAsync(tdd => tdd.TargetDateId == targetDate.Id);
+            
+            Console.WriteLine($"[SEED] TargetDate '{targetDate.Name}' has {existingCount} existing destinations");
+            
+            if (existingCount >= 2)
+            {
+                Console.WriteLine($"[SEED] Skipping '{targetDate.Name}' - already has {existingCount} destinations");
+                continue; // Already has associations
+            }
+
+            // Select 2 random destinations (prefer popular ones)
+            var pool = preferredDestinations.Any() ? preferredDestinations : fallbackDestinations;
+            var selectedDestinations = pool
+                .OrderBy(_ => random.Next())
+                .Take(2)
+                .ToList();
+
+            Console.WriteLine($"[SEED] Selected for '{targetDate.Name}': {string.Join(", ", selectedDestinations.Select(d => d.AirportCode))}");
+
+            foreach (var destination in selectedDestinations)
             {
                 // Check if association already exists
                 var exists = await context.TargetDateDestinations.AnyAsync(tdd =>
@@ -92,11 +125,14 @@ public static class DataSeeder
                         DestinationId = destination.Id,
                         CreatedAt = DateTime.UtcNow
                     });
+                    Console.WriteLine($"[SEED] Added {destination.AirportCode} to '{targetDate.Name}'");
                 }
             }
         }
 
+        Console.WriteLine($"[SEED] Saving {context.ChangeTracker.Entries<TargetDateDestination>().Count()} destination associations...");
         await context.SaveChangesAsync();
+        Console.WriteLine("[SEED] Destination associations saved successfully");
     }
 
     private static async Task SeedPriceCheck(
@@ -108,7 +144,17 @@ public static class DataSeeder
     {
         foreach (var targetDate in targetDates)
         {
-            foreach (var destination in destinations)
+            // Get only the destinations associated with this target date
+            var associatedDestinationIds = await context.TargetDateDestinations
+                .Where(tdd => tdd.TargetDateId == targetDate.Id)
+                .Select(tdd => tdd.DestinationId)
+                .ToListAsync();
+            
+            var associatedDestinations = destinations
+                .Where(d => associatedDestinationIds.Contains(d.Id))
+                .ToList();
+
+            foreach (var destination in associatedDestinations)
             {
                 // Check if price check already exists
                 var exists = await context.PriceChecks.AnyAsync(p =>
