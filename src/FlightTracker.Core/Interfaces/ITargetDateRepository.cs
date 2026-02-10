@@ -52,4 +52,20 @@ public interface ITargetDateRepository : IRepository<TargetDate>
     /// Update an existing target date.
     /// </summary>
     Task<bool> UpdateTargetDateAsync(TargetDate targetDate, CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Get all destinations associated with a target date.
+    /// </summary>
+    Task<IEnumerable<Destination>> GetDestinationsAsync(int targetDateId, CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Update destination associations for a target date.
+    /// Replaces existing associations with the provided destination IDs.
+    /// </summary>
+    Task UpdateDestinationsAsync(int targetDateId, IEnumerable<int> destinationIds, CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Get target date with destinations included.
+    /// </summary>
+    Task<TargetDate?> GetByIdWithDestinationsAsync(int id, CancellationToken cancellationToken = default);
 }

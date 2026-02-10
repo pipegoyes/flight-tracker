@@ -119,4 +119,42 @@ public class TargetDateRepository : Repository<TargetDate>, ITargetDateRepositor
         await _context.SaveChangesAsync(cancellationToken);
         return true;
     }
+
+    public async Task<IEnumerable<Destination>> GetDestinationsAsync(int targetDateId, CancellationToken cancellationToken = default)
+    {
+        return await _context.TargetDateDestinations
+            .Where(tdd => tdd.TargetDateId == targetDateId)
+            .Include(tdd => tdd.Destination)
+            .Select(tdd => tdd.Destination)
+            .ToListAsync(cancellationToken);
+    }
+
+    public async Task UpdateDestinationsAsync(int targetDateId, IEnumerable<int> destinationIds, CancellationToken cancellationToken = default)
+    {
+        // Remove existing associations
+        var existing = await _context.TargetDateDestinations
+            .Where(tdd => tdd.TargetDateId == targetDateId)
+            .ToListAsync(cancellationToken);
+        
+        _context.TargetDateDestinations.RemoveRange(existing);
+
+        // Add new associations
+        var newAssociations = destinationIds.Select(destId => new TargetDateDestination
+        {
+            TargetDateId = targetDateId,
+            DestinationId = destId,
+            CreatedAt = DateTime.UtcNow
+        });
+
+        await _context.TargetDateDestinations.AddRangeAsync(newAssociations, cancellationToken);
+        await _context.SaveChangesAsync(cancellationToken);
+    }
+
+    public async Task<TargetDate?> GetByIdWithDestinationsAsync(int id, CancellationToken cancellationToken = default)
+    {
+        return await _dbSet
+            .Include(t => t.TargetDateDestinations)
+                .ThenInclude(tdd => tdd.Destination)
+            .FirstOrDefaultAsync(t => t.Id == id, cancellationToken);
+    }
 }

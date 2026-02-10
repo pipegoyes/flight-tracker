@@ -28,6 +28,11 @@ public class FlightTrackerDbContext : DbContext
     /// </summary>
     public DbSet<PriceCheck> PriceChecks => Set<PriceCheck>();
 
+    /// <summary>
+    /// Junction table for many-to-many relationship between TargetDates and Destinations.
+    /// </summary>
+    public DbSet<TargetDateDestination> TargetDateDestinations => Set<TargetDateDestination>();
+
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         base.OnModelCreating(modelBuilder);
@@ -115,6 +120,30 @@ public class FlightTrackerDbContext : DbContext
             // Indexes for performance
             entity.HasIndex(e => new { e.TargetDateId, e.DestinationId });
             entity.HasIndex(e => e.CheckTimestamp);
+        });
+
+        // Configure TargetDateDestination
+        modelBuilder.Entity<TargetDateDestination>(entity =>
+        {
+            entity.HasKey(e => e.Id);
+            
+            entity.Property(e => e.CreatedAt)
+                .IsRequired();
+            
+            // Relationships
+            entity.HasOne(e => e.TargetDate)
+                .WithMany(t => t.TargetDateDestinations)
+                .HasForeignKey(e => e.TargetDateId)
+                .OnDelete(DeleteBehavior.Cascade);
+            
+            entity.HasOne(e => e.Destination)
+                .WithMany(d => d.TargetDateDestinations)
+                .HasForeignKey(e => e.DestinationId)
+                .OnDelete(DeleteBehavior.Cascade);
+            
+            // Unique constraint: each destination can only be associated once per target date
+            entity.HasIndex(e => new { e.TargetDateId, e.DestinationId })
+                .IsUnique();
         });
     }
 }

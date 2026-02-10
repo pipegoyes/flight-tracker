@@ -24,4 +24,9 @@ public class Destination
     /// Navigation property to price checks for this destination.
     /// </summary>
     public ICollection<PriceCheck> PriceChecks { get; set; } = new List<PriceCheck>();
+
+    /// <summary>
+    /// Navigation property to target date associations.
+    /// </summary>
+    public ICollection<TargetDateDestination> TargetDateDestinations { get; set; } = new List<TargetDateDestination>();
 }
