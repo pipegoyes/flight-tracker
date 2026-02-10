@@ -20,6 +20,7 @@ builder.WebHost.UseSentry(options =>
     options.AttachStacktrace = true;
     options.SendDefaultPii = false; // Don't send personally identifiable information
     options.MaxBreadcrumbs = 50;
+    options.EnableLogs = true; // Enable log integration
 });
 
 // Add services to the container.
