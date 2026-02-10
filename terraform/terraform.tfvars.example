@@ -1,0 +1,48 @@
+# Azure Configuration
+resource_group_name = "flight-tracker-rg"
+location            = "westeurope" # Options: westeurope, germanywestcentral, northeurope
+
+# Application Configuration
+app_name = "flighttracker"
+
+# App Service Plan SKU
+# B1 = Free tier eligible (first 12 months), 1.75 GB RAM, 1 vCPU
+# F1 = Free forever (limited), 1 GB RAM, 60 min/day compute
+app_service_sku = "B1"
+
+# Container Registry SKU
+# Basic = $5/month, 10 GB storage, suitable for dev/test
+# Standard = $20/month, 100 GB storage, webhooks
+# Premium = $40/month, 500 GB storage, geo-replication
+acr_sku = "Basic"
+
+# Docker Image
+docker_image_name = "flight-tracker"
+docker_image_tag  = "latest"
+
+# Environment
+environment = "Production"
+
+# Sentry Configuration (required)
+sentry_dsn = "https://1bd573b8c99620f98e60715ad367d054@o4510860611092480.ingest.de.sentry.io/4510860612862032"
+
+# Flight Tracker Configuration
+flight_tracker_origin = "FRA"
+
+# Flight Provider Configuration
+# Options: "Mock" (fake data), "BookingCom" (requires API key), "Skyscanner" (not implemented)
+flight_provider_type    = "Mock"
+flight_provider_api_key = "" # Only needed if using BookingCom or Skyscanner
+flight_provider_api_host = "" # e.g., "booking-com.p.rapidapi.com"
+
+# Custom Domain (optional)
+# Uncomment and configure if you have a custom domain
+# custom_domain = "flights.yourdomain.com"
+
+# Tags
+tags = {
+  Environment = "Production"
+  ManagedBy   = "Terraform"
+  Project     = "FlightTracker"
+  Owner       = "Felipe"
+}
