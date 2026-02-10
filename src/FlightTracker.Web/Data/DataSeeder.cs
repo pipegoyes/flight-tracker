@@ -6,6 +6,35 @@ namespace FlightTracker.Web.Data;
 
 public static class DataSeeder
 {
+    /// <summary>
+    /// Seed all airports from AirportSeedData.
+    /// </summary>
+    public static async Task SeedAirportsAsync(FlightTrackerDbContext context)
+    {
+        // Check if airports are already seeded
+        var existingCount = await context.Destinations.CountAsync();
+        if (existingCount > 10) // If we have more than 10, assume it's seeded
+        {
+            return;
+        }
+
+        var airports = AirportSeedData.GetAirports();
+        
+        foreach (var airport in airports)
+        {
+            // Check if already exists
+            var exists = await context.Destinations
+                .AnyAsync(d => d.AirportCode == airport.AirportCode);
+            
+            if (!exists)
+            {
+                context.Destinations.Add(airport);
+            }
+        }
+
+        await context.SaveChangesAsync();
+    }
+
     public static async Task SeedHistoricalPriceDataAsync(FlightTrackerDbContext context)
     {
         // Get all destinations and target dates

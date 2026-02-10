@@ -2,8 +2,9 @@
 @rendermode InteractiveServer
 @using FlightTracker.Core.Entities
 @using FlightTracker.Core.Interfaces
+@using FlightTracker.Core.Services
 @inject ITargetDateRepository TargetDateRepository
-@inject IDestinationRepository DestinationRepository
+@inject AirportCacheService AirportCacheService
 @inject NavigationManager Navigation
 
 <PageTitle>Manage Travel Dates</PageTitle>
@@ -53,40 +54,42 @@
             <div class="mb-3">
                 <label class="form-label fw-bold">Destinations</label>
                 
-                <div class="mb-2">
+                <div class="autocomplete-wrapper position-relative">
                     <input type="text" 
                            class="form-control" 
-                           placeholder="🔍 Filter airports..."
-                           @oninput="OnSearchChange"
-                           value="@searchQuery" />
-                </div>
-
-                <div class="destinations-table">
-                    <table class="table table-sm table-hover">
-                        <thead>
-                            <tr>
-                                <th style="width: 50px;"></th>
-                                <th>Code</th>
-                                <th>Airport Name</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            @foreach (var dest in GetFilteredDestinations())
+                           placeholder="🔍 Type to search airports (e.g., Berlin, PMI, Mallorca)..."
+                           value="@searchQuery"
+                           @oninput="OnSearchInput"
+                           @onfocusin="OnSearchFocusIn"
+                           @ref="searchInputRef" />
+                    
+                    @if (showDropdown && filteredAirports.Any())
+                    {
+                        <div class="autocomplete-dropdown" @onmousedown:preventDefault>
+                            @foreach (var airport in filteredAirports)
                             {
-                                var isSelected = selectedDestinations.Any(d => d.Id == dest.Id);
-                                <tr style="cursor: pointer;" @onclick="@(() => ToggleDestination(dest))">
-                                    <td class="text-center">
-                                        <input type="checkbox" 
-                                               checked="@isSelected"
-                                               @onclick:stopPropagation="true"
-                                               @onchange="@(() => ToggleDestination(dest))" />
-                                    </td>
-                                    <td><strong>@dest.AirportCode</strong></td>
-                                    <td>@dest.Name</td>
-                                </tr>
+                                <div class="autocomplete-item" @onclick="() => SelectAirport(airport)">
+                                    <strong>@airport.AirportCode</strong> - @airport.Name
+                                </div>
                             }
-                        </tbody>
-                    </table>
+                            
+                            @if (filteredAirports.Count >= 10)
+                            {
+                                <div class="autocomplete-hint">
+                                    <small class="text-muted">Type more to refine search...</small>
+                                </div>
+                            }
+                        </div>
+                    }
+                    
+                    @if (!string.IsNullOrWhiteSpace(searchQuery) && !filteredAirports.Any())
+                    {
+                        <div class="autocomplete-dropdown">
+                            <div class="autocomplete-hint">
+                                <small class="text-muted">No airports found. Try searching by code (PMI) or name (Mallorca)</small>
+                            </div>
+                        </div>
+                    }
                 </div>
 
                 @if (selectedDestinations.Any())
@@ -96,8 +99,8 @@
                         @foreach (var dest in selectedDestinations)
                         {
                             <span class="badge bg-primary">
-                                @dest.AirportCode
-                                <button type="button" class="btn-close-chip" @onclick="@(() => RemoveDestination(dest.Id))">×</button>
+                                @dest.AirportCode - @dest.Name
+                                <button type="button" class="btn-close-chip" @onclick="() => RemoveDestination(dest.Id)">×</button>
                             </span>
                         }
                     </div>
@@ -266,27 +269,45 @@
         opacity: 0.8;
     }
 
-    .destinations-table {
+    .autocomplete-wrapper {
+        position: relative;
+    }
+
+    .autocomplete-dropdown {
+        position: absolute;
+        top: 100%;
+        left: 0;
+        right: 0;
+        background: white;
+        border: 1px solid #ced4da;
+        border-top: none;
+        border-radius: 0 0 0.375rem 0.375rem;
         max-height: 300px;
         overflow-y: auto;
-        border: 1px solid #dee2e6;
-        border-radius: 0.375rem;
+        z-index: 1050;
+        box-shadow: 0 0.5rem 1rem rgba(0, 0, 0, 0.15);
+        margin-top: -1px;
     }
 
-    .destinations-table table {
-        margin-bottom: 0;
+    .autocomplete-item {
+        padding: 0.75rem 1rem;
+        cursor: pointer;
+        border-bottom: 1px solid #f0f0f0;
+        transition: background-color 0.15s;
     }
 
-    .destinations-table thead th {
-        position: sticky;
-        top: 0;
+    .autocomplete-item:hover {
         background: #f8f9fa;
-        z-index: 10;
-        border-bottom: 2px solid #dee2e6;
     }
 
-    .destinations-table tbody tr:hover {
-        background-color: #f8f9fa;
+    .autocomplete-item:last-child {
+        border-bottom: none;
+    }
+
+    .autocomplete-hint {
+        padding: 0.5rem 1rem;
+        background: #f8f9fa;
+        border-top: 1px solid #e9ecef;
     }
 </style>
 
@@ -303,14 +324,19 @@
     
     private TargetDateModel newDate = new();
     
-    // Destination selection
-    private List<Destination> allDestinations = new();
+    // Autocomplete
     private List<Destination> selectedDestinations = new();
+    private List<Destination> filteredAirports = new();
     private string searchQuery = "";
+    private bool showDropdown = false;
+    private ElementReference searchInputRef;
+    
+    // Debouncing
+    private System.Threading.Timer? _debounceTimer;
+    private const int DebounceDelayMs = 300;
 
     protected override async Task OnInitializedAsync()
     {
-        allDestinations = (await DestinationRepository.GetAllAsync()).ToList();
         await LoadDates();
     }
 
@@ -340,6 +366,9 @@
             ReturnDate = DateTime.Today.AddMonths(1).AddDays(3)
         };
         selectedDestinations.Clear();
+        searchQuery = "";
+        filteredAirports.Clear();
+        showDropdown = false;
         validationMessage = string.Empty;
         showAddForm = true;
     }
@@ -358,6 +387,9 @@
         var destinations = await TargetDateRepository.GetDestinationsAsync(date.Id);
         selectedDestinations = destinations.ToList();
         
+        searchQuery = "";
+        filteredAirports.Clear();
+        showDropdown = false;
         validationMessage = string.Empty;
         showAddForm = true;
     }
@@ -368,6 +400,8 @@
         editingDate = null;
         selectedDestinations.Clear();
         searchQuery = "";
+        filteredAirports.Clear();
+        showDropdown = false;
         validationMessage = string.Empty;
     }
 
@@ -461,40 +495,70 @@
         showDeleted = true;
     }
 
-    // Destination selection methods
-    private void OnSearchChange(ChangeEventArgs e)
+    // Autocomplete methods
+    private void OnSearchFocusIn()
     {
-        searchQuery = e.Value?.ToString() ?? "";
-        StateHasChanged();
+        if (!string.IsNullOrWhiteSpace(searchQuery))
+        {
+            showDropdown = true;
+        }
     }
 
-    private List<Destination> GetFilteredDestinations()
+    private void OnSearchInput(ChangeEventArgs e)
+    {
+        searchQuery = e.Value?.ToString() ?? "";
+        DebouncedSearch();
+    }
+
+    private void DebouncedSearch()
+    {
+        _debounceTimer?.Dispose();
+        _debounceTimer = new System.Threading.Timer(async _ =>
+        {
+            await InvokeAsync(async () =>
+            {
+                await PerformSearch();
+                StateHasChanged();
+            });
+        }, null, DebounceDelayMs, Timeout.Infinite);
+    }
+
+    private async Task PerformSearch()
     {
         if (string.IsNullOrWhiteSpace(searchQuery))
         {
-            return allDestinations;
+            filteredAirports.Clear();
+            showDropdown = false;
+            return;
         }
 
-        return allDestinations
-            .Where(d => 
-                d.AirportCode.Contains(searchQuery, StringComparison.OrdinalIgnoreCase) ||
-                d.Name.Contains(searchQuery, StringComparison.OrdinalIgnoreCase))
+        if (searchQuery.Length < 2)
+        {
+            showDropdown = false;
+            return;
+        }
+
+        // Search using cached service
+        var results = await AirportCacheService.SearchDestinationsAsync(searchQuery, maxResults: 10);
+        
+        // Filter out already selected
+        filteredAirports = results
+            .Where(a => !selectedDestinations.Any(s => s.Id == a.Id))
             .ToList();
+        
+        showDropdown = true;
     }
 
-    private void ToggleDestination(Destination dest)
+    private void SelectAirport(Destination airport)
     {
-        var existing = selectedDestinations.FirstOrDefault(d => d.Id == dest.Id);
-        
-        if (existing != null)
+        if (!selectedDestinations.Any(d => d.Id == airport.Id))
         {
-            selectedDestinations.Remove(existing);
-        }
-        else
-        {
-            selectedDestinations.Add(dest);
+            selectedDestinations.Add(airport);
         }
         
+        searchQuery = "";
+        filteredAirports.Clear();
+        showDropdown = false;
         StateHasChanged();
     }
 
@@ -502,6 +566,11 @@
     {
         selectedDestinations.RemoveAll(d => d.Id == destId);
         StateHasChanged();
+    }
+
+    public void Dispose()
+    {
+        _debounceTimer?.Dispose();
     }
 
     // Model for form binding

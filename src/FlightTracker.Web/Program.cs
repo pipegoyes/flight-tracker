@@ -46,6 +46,7 @@ builder.Services.AddScoped<IPriceCheckRepository, PriceCheckRepository>();
 builder.Services.AddScoped<FlightSearchService>();
 builder.Services.AddScoped<PriceHistoryService>();
 builder.Services.AddScoped<ConfigurationService>();
+builder.Services.AddSingleton<AirportCacheService>(); // Singleton for caching
 
 // Register background service for automated price checks
 builder.Services.AddHostedService<PriceCheckBackgroundService>();
@@ -129,6 +130,9 @@ using (var scope = app.Services.CreateScope())
         
         // Create database if it doesn't exist
         context.Database.EnsureCreated();
+        
+        // Seed comprehensive airport list first
+        await DataSeeder.SeedAirportsAsync(context);
         
         // Sync configuration with database
         await configService.InitializeAllAsync();
