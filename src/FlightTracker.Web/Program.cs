@@ -157,3 +157,6 @@ using (var scope = app.Services.CreateScope())
 }
 
 app.Run();
+
+// Make Program class accessible for integration tests
+public partial class Program { }

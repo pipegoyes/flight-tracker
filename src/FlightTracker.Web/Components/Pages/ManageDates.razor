@@ -41,13 +41,13 @@
                     <label class="form-label fw-bold">Outbound Date</label>
                     <input type="date" class="form-control" 
                            value="@newDate.OutboundDate.ToString("yyyy-MM-dd")"
-                           @onchange="@((ChangeEventArgs e) => newDate.OutboundDate = DateTime.Parse(e.Value?.ToString() ?? DateTime.Today.ToString()))" />
+                           @onchange="OnOutboundDateChange" />
                 </div>
                 <div class="col-md-6 mb-3">
                     <label class="form-label fw-bold">Return Date</label>
                     <input type="date" class="form-control" 
                            value="@newDate.ReturnDate.ToString("yyyy-MM-dd")"
-                           @onchange="@((ChangeEventArgs e) => newDate.ReturnDate = DateTime.Parse(e.Value?.ToString() ?? DateTime.Today.ToString()))" />
+                           @onchange="OnReturnDateChange" />
                 </div>
             </div>
 
@@ -493,6 +493,25 @@
     private void ShowDeletedDates()
     {
         showDeleted = true;
+    }
+
+    // Date change handlers with safe parsing
+    private void OnOutboundDateChange(ChangeEventArgs e)
+    {
+        var value = e.Value?.ToString();
+        if (!string.IsNullOrWhiteSpace(value) && DateTime.TryParse(value, out var date))
+        {
+            newDate.OutboundDate = date;
+        }
+    }
+
+    private void OnReturnDateChange(ChangeEventArgs e)
+    {
+        var value = e.Value?.ToString();
+        if (!string.IsNullOrWhiteSpace(value) && DateTime.TryParse(value, out var date))
+        {
+            newDate.ReturnDate = date;
+        }
     }
 
     // Autocomplete methods
