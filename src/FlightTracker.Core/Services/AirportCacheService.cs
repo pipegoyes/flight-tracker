@@ -1,26 +1,29 @@
 using FlightTracker.Core.Entities;
 using FlightTracker.Core.Interfaces;
+using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 
 namespace FlightTracker.Core.Services;
 
 /// <summary>
 /// Caching service for airport/destination data to avoid repeated database queries.
+/// Uses IServiceScopeFactory to resolve scoped dependencies safely from singleton.
 /// </summary>
 public class AirportCacheService
 {
-    private readonly IDestinationRepository _destinationRepository;
+    private readonly IServiceScopeFactory _scopeFactory;
     private readonly ILogger<AirportCacheService> _logger;
     
     private List<Destination>? _cachedDestinations;
     private DateTime? _cacheTime;
     private readonly TimeSpan _cacheExpiration = TimeSpan.FromHours(24);
+    private readonly SemaphoreSlim _cacheLock = new(1, 1);
 
     public AirportCacheService(
-        IDestinationRepository destinationRepository,
+        IServiceScopeFactory scopeFactory,
         ILogger<AirportCacheService> logger)
     {
-        _destinationRepository = destinationRepository;
+        _scopeFactory = scopeFactory;
         _logger = logger;
     }
 
@@ -38,14 +41,35 @@ public class AirportCacheService
             return _cachedDestinations;
         }
 
-        // Reload from database
-        _logger.LogInformation("Loading destinations from database");
-        var destinations = await _destinationRepository.GetAllAsync(cancellationToken);
-        _cachedDestinations = destinations.OrderBy(d => d.Name).ToList();
-        _cacheTime = DateTime.UtcNow;
+        // Acquire lock to prevent multiple simultaneous loads
+        await _cacheLock.WaitAsync(cancellationToken);
+        try
+        {
+            // Double-check after acquiring lock
+            if (_cachedDestinations != null && 
+                _cacheTime.HasValue && 
+                DateTime.UtcNow - _cacheTime.Value < _cacheExpiration)
+            {
+                return _cachedDestinations;
+            }
 
-        _logger.LogInformation("Cached {Count} destinations", _cachedDestinations.Count);
-        return _cachedDestinations;
+            // Reload from database using scoped repository
+            _logger.LogInformation("Loading destinations from database");
+            
+            using var scope = _scopeFactory.CreateScope();
+            var repository = scope.ServiceProvider.GetRequiredService<IDestinationRepository>();
+            var destinations = await repository.GetAllAsync(cancellationToken);
+            
+            _cachedDestinations = destinations.OrderBy(d => d.Name).ToList();
+            _cacheTime = DateTime.UtcNow;
+
+            _logger.LogInformation("Cached {Count} destinations", _cachedDestinations.Count);
+            return _cachedDestinations;
+        }
+        finally
+        {
+            _cacheLock.Release();
+        }
     }
 
     /// <summary>
