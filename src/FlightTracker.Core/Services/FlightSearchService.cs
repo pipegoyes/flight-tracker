@@ -234,11 +234,13 @@ public class FlightSearchService
     /// <param name="originAirportCode">Origin airport (e.g., "FRA")</param>
     /// <param name="targetDateId">Target date ID</param>
     /// <param name="maxAgeHours">Maximum age of cached prices in hours (default: 6 hours)</param>
+    /// <param name="progress">Optional progress reporter for UI updates</param>
     /// <returns>Tuple of (cachedCount, fetchedCount, totalResults)</returns>
     public async Task<(int cachedCount, int fetchedCount, IEnumerable<PriceCheck> results)> CheckPricesForTargetDateAsync(
         string originAirportCode,
         int targetDateId,
         int maxAgeHours = 6,
+        IProgress<(int current, int total, string destinationName, bool isCached)>? progress = null,
         CancellationToken cancellationToken = default)
     {
         var cachedCount = 0;
@@ -274,10 +276,18 @@ public class FlightSearchService
             destinationsList.Count,
             maxAgeHours);
 
+        var currentIndex = 0;
+        var totalDestinations = destinationsList.Count;
+
         foreach (var destination in destinationsList)
         {
+            currentIndex++;
+
             try
             {
+                // Report progress - starting check
+                progress?.Report((currentIndex, totalDestinations, destination.Name, false));
+
                 // Check if we have a recent price
                 var recentPrice = await _priceCheckRepository.GetRecentPriceAsync(
                     targetDateId,
@@ -297,6 +307,9 @@ public class FlightSearchService
 
                     results.Add(recentPrice);
                     cachedCount++;
+
+                    // Report progress - cached
+                    progress?.Report((currentIndex, totalDestinations, destination.Name, true));
                 }
                 else
                 {
@@ -317,6 +330,9 @@ public class FlightSearchService
                         results.Add(freshPrice);
                         fetchedCount++;
                     }
+
+                    // Report progress - fetched
+                    progress?.Report((currentIndex, totalDestinations, destination.Name, false));
 
                     // Rate limiting: delay between API calls
                     if (fetchedCount > 0)

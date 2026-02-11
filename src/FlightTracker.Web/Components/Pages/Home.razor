@@ -59,7 +59,25 @@
                         </button>
                     </div>
                 </div>
-                @if (lastCheckResult != null)
+                @if (isCheckingPrices && checkProgress != null)
+                {
+                    <div class="mt-3">
+                        <div class="d-flex justify-content-between mb-1">
+                            <small class="text-muted">@checkProgress.StatusText</small>
+                            <small class="text-muted">@checkProgress.Current / @checkProgress.Total</small>
+                        </div>
+                        <div class="progress" style="height: 8px;">
+                            <div class="progress-bar progress-bar-striped progress-bar-animated" 
+                                 role="progressbar" 
+                                 style="width: @(checkProgress.PercentComplete)%"
+                                 aria-valuenow="@checkProgress.Current" 
+                                 aria-valuemin="0" 
+                                 aria-valuemax="@checkProgress.Total">
+                            </div>
+                        </div>
+                    </div>
+                }
+                @if (!isCheckingPrices && lastCheckResult != null)
                 {
                     <div class="mt-2">
                         <small class="text-muted">
@@ -151,6 +169,15 @@
     private bool isCheckingPrices = false;
     private string? errorMessage;
     private string? lastCheckResult;
+    private CheckProgressInfo? checkProgress;
+
+    private class CheckProgressInfo
+    {
+        public int Current { get; set; }
+        public int Total { get; set; }
+        public string StatusText { get; set; } = "";
+        public int PercentComplete => Total > 0 ? (Current * 100) / Total : 0;
+    }
 
     protected override async Task OnInitializedAsync()
     {
@@ -223,12 +250,31 @@
             isCheckingPrices = true;
             lastCheckResult = null;
             errorMessage = null;
+            checkProgress = null;
+
+            // Create progress reporter
+            var progressReporter = new Progress<(int current, int total, string destinationName, bool isCached)>(update =>
+            {
+                var (current, total, destinationName, isCached) = update;
+                var action = isCached ? "✓ Cached" : "🔄 Checking";
+                
+                checkProgress = new CheckProgressInfo
+                {
+                    Current = current,
+                    Total = total,
+                    StatusText = $"{action}: {destinationName}"
+                };
+                
+                // Trigger UI update
+                InvokeAsync(StateHasChanged);
+            });
 
             // Call the on-demand price check (6 hour cache)
             var (cachedCount, fetchedCount, results) = await FlightSearchService.CheckPricesForTargetDateAsync(
                 "FRA", // Origin airport
                 selectedTargetDateId.Value,
-                maxAgeHours: 6);
+                maxAgeHours: 6,
+                progress: progressReporter);
 
             // Update the prices
             priceChecks = results.ToList();
@@ -259,6 +305,7 @@
         finally
         {
             isCheckingPrices = false;
+            checkProgress = null;
         }
     }
 

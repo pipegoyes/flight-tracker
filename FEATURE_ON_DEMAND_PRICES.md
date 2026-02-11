@@ -11,7 +11,11 @@ Added the ability to manually trigger price checks with intelligent caching to a
 ### 1. **"Check Prices Now" Button**
 - Located on the home page next to the date selector
 - Only enabled when a travel date is selected
-- Shows loading spinner during price check
+- Shows **animated progress bar** during price check with:
+  - Current destination being checked
+  - Progress count (e.g., "2 / 5")
+  - Status: "🔄 Checking" or "✓ Cached"
+  - Visual progress bar with animation
 - Displays result summary after completion
 
 ### 2. **Smart Caching (6-hour window)**
@@ -27,7 +31,16 @@ Shows clear messages:
 - `ℹ️ All prices are recent (cached X result(s)...` - All cached
 - `⚠️ No prices found for selected destinations.` - No results
 
-### 4. **Rate Limiting**
+### 4. **Progress Bar**
+- Real-time visual feedback during price checking
+- Shows current destination name and status
+- Progress counter (e.g., "Checking 3 of 5")
+- Animated striped progress bar
+- Different indicators:
+  - `🔄 Checking: [Destination]` - Fetching fresh price
+  - `✓ Cached: [Destination]` - Using cached price
+
+### 5. **Rate Limiting**
 - 2-second delay between API calls
 - Prevents hitting provider rate limits
 - Only applies to fresh fetches (cached prices are instant)
@@ -56,10 +69,16 @@ CheckPricesForTargetDateAsync(
     string originAirportCode,
     int targetDateId,
     int maxAgeHours = 6,
+    IProgress<(int current, int total, string destinationName, bool isCached)>? progress = null,
     CancellationToken cancellationToken = default);
 ```
 
 Main method for on-demand price checking with caching logic.
+
+**Progress Reporting:**
+- Uses `IProgress<T>` pattern for real-time UI updates
+- Reports: current index, total count, destination name, cached status
+- Progress updates are sent after checking each destination
 
 ---
 
@@ -144,6 +163,30 @@ await FlightSearchService.CheckPricesForTargetDateAsync(
         </button>
     </div>
 </div>
+
+<!-- Progress bar (shown during check) -->
+@if (isCheckingPrices && checkProgress != null)
+{
+    <div class="mt-3">
+        <div class="d-flex justify-content-between mb-1">
+            <small>🔄 Checking: Palma de Mallorca</small>
+            <small>3 / 5</small>
+        </div>
+        <div class="progress" style="height: 8px;">
+            <div class="progress-bar progress-bar-striped progress-bar-animated" 
+                 style="width: 60%">
+            </div>
+        </div>
+    </div>
+}
+
+<!-- Result message (shown after check) -->
+@if (!isCheckingPrices && lastCheckResult != null)
+{
+    <small class="text-muted">
+        ✅ Updated! 2 new price(s) fetched, 3 cached.
+    </small>
+}
 ```
 
 ---
@@ -177,7 +220,7 @@ await FlightSearchService.CheckPricesForTargetDateAsync(
 
 ### Potential Improvements
 
-1. **Per-Destination Cache Indicator**
+1. **Per-Destination Cache Indicator** (on price cards)
    ```html
    <span class="badge bg-secondary">Cached (2h ago)</span>
    <span class="badge bg-success">Fresh (just now)</span>
@@ -192,16 +235,16 @@ await FlightSearchService.CheckPricesForTargetDateAsync(
    </select>
    ```
 
-3. **Progress Indicator**
-   ```html
-   Checking prices: 2/5 destinations...
-   ```
-
-4. **Selective Refresh**
+3. **Selective Refresh**
    ```html
    <button @onclick="() => RefreshDestination(destId)">
        🔄 Refresh This Destination
    </button>
+   ```
+
+4. **Estimated Time Remaining**
+   ```html
+   🔄 Checking: Berlin (estimated 8s remaining)
    ```
 
 ---
