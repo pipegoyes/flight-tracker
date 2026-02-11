@@ -156,6 +156,7 @@ public class FlightSearchService
 
     /// <summary>
     /// Search and save flights for all configured routes.
+    /// Only searches destinations that are associated with each target date.
     /// </summary>
     public async Task<int> SearchAllRoutesAsync(
         string originAirportCode,
@@ -166,12 +167,29 @@ public class FlightSearchService
         // Get all upcoming target dates
         var targetDates = await _targetDateRepository.GetUpcomingAsync(cancellationToken);
 
-        // Get all destinations
-        var destinations = await _destinationRepository.GetAllAsync(cancellationToken);
-
         foreach (var targetDate in targetDates)
         {
-            foreach (var destination in destinations)
+            // Get destinations associated with this specific target date
+            var destinations = await _targetDateRepository.GetDestinationsAsync(
+                targetDate.Id, 
+                cancellationToken);
+
+            var destinationsList = destinations.ToList();
+
+            if (!destinationsList.Any())
+            {
+                _logger.LogWarning(
+                    "No destinations configured for target date: {DateName}. Skipping.",
+                    targetDate.Name);
+                continue;
+            }
+
+            _logger.LogInformation(
+                "Searching flights for {DateName}: {DestCount} destination(s)",
+                targetDate.Name,
+                destinationsList.Count);
+
+            foreach (var destination in destinationsList)
             {
                 try
                 {

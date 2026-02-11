@@ -2,7 +2,9 @@
 @rendermode InteractiveServer
 @using FlightTracker.Core.Entities
 @using FlightTracker.Core.Interfaces
+@using FlightTracker.Core.Services
 @inject ITargetDateRepository TargetDateRepository
+@inject AirportCacheService AirportCacheService
 @inject NavigationManager Navigation
 
 <PageTitle>Manage Travel Dates</PageTitle>
@@ -39,14 +41,90 @@
                     <label class="form-label fw-bold">Outbound Date</label>
                     <input type="date" class="form-control" 
                            value="@newDate.OutboundDate.ToString("yyyy-MM-dd")"
-                           @onchange="@((ChangeEventArgs e) => newDate.OutboundDate = DateTime.Parse(e.Value?.ToString() ?? DateTime.Today.ToString()))" />
+                           min="@DateTime.Today.ToString("yyyy-MM-dd")"
+                           max="@DateTime.Today.AddYears(2).ToString("yyyy-MM-dd")"
+                           required
+                           @onchange="OnOutboundDateChange" />
+                    @if (!string.IsNullOrEmpty(outboundDateError))
+                    {
+                        <small class="text-danger">@outboundDateError</small>
+                    }
                 </div>
                 <div class="col-md-6 mb-3">
                     <label class="form-label fw-bold">Return Date</label>
                     <input type="date" class="form-control" 
                            value="@newDate.ReturnDate.ToString("yyyy-MM-dd")"
-                           @onchange="@((ChangeEventArgs e) => newDate.ReturnDate = DateTime.Parse(e.Value?.ToString() ?? DateTime.Today.ToString()))" />
+                           min="@DateTime.Today.ToString("yyyy-MM-dd")"
+                           max="@DateTime.Today.AddYears(2).ToString("yyyy-MM-dd")"
+                           required
+                           @onchange="OnReturnDateChange" />
+                    @if (!string.IsNullOrEmpty(returnDateError))
+                    {
+                        <small class="text-danger">@returnDateError</small>
+                    }
                 </div>
+            </div>
+
+            <div class="mb-3">
+                <label class="form-label fw-bold">Destinations</label>
+                
+                <div class="autocomplete-wrapper position-relative">
+                    <input type="text" 
+                           class="form-control" 
+                           placeholder="🔍 Type to search airports (e.g., Berlin, PMI, Mallorca)..."
+                           value="@searchQuery"
+                           @oninput="OnSearchInput"
+                           @onfocusin="OnSearchFocusIn"
+                           @ref="searchInputRef" />
+                    
+                    @if (showDropdown && filteredAirports.Any())
+                    {
+                        <div class="autocomplete-dropdown" @onmousedown:preventDefault>
+                            @foreach (var airport in filteredAirports)
+                            {
+                                <div class="autocomplete-item" @onclick="() => SelectAirport(airport)">
+                                    <strong>@airport.AirportCode</strong> - @airport.Name
+                                </div>
+                            }
+                            
+                            @if (filteredAirports.Count >= 10)
+                            {
+                                <div class="autocomplete-hint">
+                                    <small class="text-muted">Type more to refine search...</small>
+                                </div>
+                            }
+                        </div>
+                    }
+                    
+                    @if (!string.IsNullOrWhiteSpace(searchQuery) && !filteredAirports.Any())
+                    {
+                        <div class="autocomplete-dropdown">
+                            <div class="autocomplete-hint">
+                                <small class="text-muted">No airports found. Try searching by code (PMI) or name (Mallorca)</small>
+                            </div>
+                        </div>
+                    }
+                </div>
+
+                @if (selectedDestinations.Any())
+                {
+                    <div class="destination-chips mt-2">
+                        <small class="text-muted me-2">Selected (@selectedDestinations.Count):</small>
+                        @foreach (var dest in selectedDestinations)
+                        {
+                            <span class="badge bg-primary">
+                                @dest.AirportCode - @dest.Name
+                                <button type="button" class="btn-close-chip" @onclick="() => RemoveDestination(dest.Id)">×</button>
+                            </span>
+                        }
+                    </div>
+                }
+                else
+                {
+                    <small class="text-danger d-block mt-2">
+                        <i class="bi bi-exclamation-triangle"></i> Please select at least one destination
+                    </small>
+                }
             </div>
 
             @if (!string.IsNullOrEmpty(validationMessage))
@@ -125,6 +203,10 @@
             {
                 @foreach (var date in activeDates)
                 {
+                    var destinations = dateDestinations.ContainsKey(date.Id) 
+                        ? dateDestinations[date.Id] 
+                        : new List<Destination>();
+
                     <div class="card mb-2">
                         <div class="card-body">
                             <div class="d-flex justify-content-between align-items-center">
@@ -136,6 +218,14 @@
                                             (@((date.ReturnDate - date.OutboundDate).Days) days)
                                         </small>
                                     </div>
+                                    @if (destinations.Any())
+                                    {
+                                        <div class="mt-1">
+                                            <small class="text-primary">
+                                                ✈️ @string.Join(" • ", destinations.Select(d => d.AirportCode))
+                                            </small>
+                                        </div>
+                                    }
                                 </div>
                                 <div class="d-flex gap-2">
                                     <button class="btn btn-sm btn-outline-primary" 
@@ -162,17 +252,104 @@
     }
 </div>
 
+<style>
+    .destination-chips {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 0.5rem;
+        align-items: center;
+    }
+
+    .destination-chips .badge {
+        font-size: 0.85rem;
+        padding: 0.4rem 0.6rem;
+        display: inline-flex;
+        align-items: center;
+        gap: 0.4rem;
+    }
+
+    .btn-close-chip {
+        background: none;
+        border: none;
+        color: white;
+        cursor: pointer;
+        font-size: 1.1rem;
+        line-height: 1;
+        padding: 0;
+        margin-left: 0.15rem;
+    }
+
+    .btn-close-chip:hover {
+        opacity: 0.8;
+    }
+
+    .autocomplete-wrapper {
+        position: relative;
+    }
+
+    .autocomplete-dropdown {
+        position: absolute;
+        top: 100%;
+        left: 0;
+        right: 0;
+        background: white;
+        border: 1px solid #ced4da;
+        border-top: none;
+        border-radius: 0 0 0.375rem 0.375rem;
+        max-height: 300px;
+        overflow-y: auto;
+        z-index: 1050;
+        box-shadow: 0 0.5rem 1rem rgba(0, 0, 0, 0.15);
+        margin-top: -1px;
+    }
+
+    .autocomplete-item {
+        padding: 0.75rem 1rem;
+        cursor: pointer;
+        border-bottom: 1px solid #f0f0f0;
+        transition: background-color 0.15s;
+    }
+
+    .autocomplete-item:hover {
+        background: #f8f9fa;
+    }
+
+    .autocomplete-item:last-child {
+        border-bottom: none;
+    }
+
+    .autocomplete-hint {
+        padding: 0.5rem 1rem;
+        background: #f8f9fa;
+        border-top: 1px solid #e9ecef;
+    }
+</style>
+
 @code {
     private List<TargetDate> activeDates = new();
     private List<TargetDate> deletedDates = new();
+    private Dictionary<int, List<Destination>> dateDestinations = new();
     private int deletedCount = 0;
     
     private bool showAddForm = false;
     private bool showDeleted = false;
     private TargetDate? editingDate = null;
     private string validationMessage = string.Empty;
+    private string outboundDateError = string.Empty;
+    private string returnDateError = string.Empty;
     
     private TargetDateModel newDate = new();
+    
+    // Autocomplete
+    private List<Destination> selectedDestinations = new();
+    private List<Destination> filteredAirports = new();
+    private string searchQuery = "";
+    private bool showDropdown = false;
+    private ElementReference searchInputRef;
+    
+    // Debouncing
+    private System.Threading.Timer? _debounceTimer;
+    private const int DebounceDelayMs = 300;
 
     protected override async Task OnInitializedAsync()
     {
@@ -184,6 +361,15 @@
         activeDates = (await TargetDateRepository.GetAllAsync()).OrderBy(d => d.OutboundDate).ToList();
         deletedDates = (await TargetDateRepository.GetDeletedAsync()).ToList();
         deletedCount = deletedDates.Count;
+
+        // Load destinations for each active date
+        dateDestinations.Clear();
+        foreach (var date in activeDates)
+        {
+            var destinations = await TargetDateRepository.GetDestinationsAsync(date.Id);
+            dateDestinations[date.Id] = destinations.ToList();
+        }
+
         StateHasChanged();
     }
 
@@ -195,11 +381,17 @@
             OutboundDate = DateTime.Today.AddMonths(1),
             ReturnDate = DateTime.Today.AddMonths(1).AddDays(3)
         };
+        selectedDestinations.Clear();
+        searchQuery = "";
+        filteredAirports.Clear();
+        showDropdown = false;
         validationMessage = string.Empty;
+        outboundDateError = string.Empty;
+        returnDateError = string.Empty;
         showAddForm = true;
     }
 
-    private void EditDate(TargetDate date)
+    private async Task EditDate(TargetDate date)
     {
         editingDate = date;
         newDate = new TargetDateModel
@@ -208,7 +400,17 @@
             OutboundDate = date.OutboundDate,
             ReturnDate = date.ReturnDate
         };
+        
+        // Load current destinations
+        var destinations = await TargetDateRepository.GetDestinationsAsync(date.Id);
+        selectedDestinations = destinations.ToList();
+        
+        searchQuery = "";
+        filteredAirports.Clear();
+        showDropdown = false;
         validationMessage = string.Empty;
+        outboundDateError = string.Empty;
+        returnDateError = string.Empty;
         showAddForm = true;
     }
 
@@ -216,7 +418,13 @@
     {
         showAddForm = false;
         editingDate = null;
+        selectedDestinations.Clear();
+        searchQuery = "";
+        filteredAirports.Clear();
+        showDropdown = false;
         validationMessage = string.Empty;
+        outboundDateError = string.Empty;
+        returnDateError = string.Empty;
     }
 
     private async Task SaveDate()
@@ -236,6 +444,12 @@
             return;
         }
 
+        if (!selectedDestinations.Any())
+        {
+            validationMessage = "Please select at least one destination.";
+            return;
+        }
+
         try
         {
             if (editingDate == null)
@@ -248,7 +462,12 @@
                     ReturnDate = newDate.ReturnDate
                 };
 
-                await TargetDateRepository.CreateTargetDateAsync(targetDate);
+                var created = await TargetDateRepository.CreateTargetDateAsync(targetDate);
+                
+                // Associate destinations
+                await TargetDateRepository.UpdateDestinationsAsync(
+                    created.Id, 
+                    selectedDestinations.Select(d => d.Id));
             }
             else
             {
@@ -258,10 +477,16 @@
                 editingDate.ReturnDate = newDate.ReturnDate;
 
                 await TargetDateRepository.UpdateTargetDateAsync(editingDate);
+                
+                // Update destinations
+                await TargetDateRepository.UpdateDestinationsAsync(
+                    editingDate.Id, 
+                    selectedDestinations.Select(d => d.Id));
             }
 
             showAddForm = false;
             editingDate = null;
+            selectedDestinations.Clear();
             await LoadDates();
         }
         catch (Exception ex)
@@ -290,6 +515,157 @@
     private void ShowDeletedDates()
     {
         showDeleted = true;
+    }
+
+    // Date change handlers with safe parsing
+    private void OnOutboundDateChange(ChangeEventArgs e)
+    {
+        outboundDateError = string.Empty;
+        var value = e.Value?.ToString();
+        
+        if (string.IsNullOrWhiteSpace(value))
+        {
+            outboundDateError = "Outbound date is required";
+            return;
+        }
+        
+        if (DateTime.TryParse(value, out var date))
+        {
+            if (date < DateTime.Today)
+            {
+                outboundDateError = "Outbound date cannot be in the past";
+                return;
+            }
+            
+            if (date > DateTime.Today.AddYears(2))
+            {
+                outboundDateError = "Outbound date cannot be more than 2 years in the future";
+                return;
+            }
+            
+            newDate.OutboundDate = date;
+        }
+        else
+        {
+            outboundDateError = "Invalid date format";
+        }
+    }
+
+    private void OnReturnDateChange(ChangeEventArgs e)
+    {
+        returnDateError = string.Empty;
+        var value = e.Value?.ToString();
+        
+        if (string.IsNullOrWhiteSpace(value))
+        {
+            returnDateError = "Return date is required";
+            return;
+        }
+        
+        if (DateTime.TryParse(value, out var date))
+        {
+            if (date < DateTime.Today)
+            {
+                returnDateError = "Return date cannot be in the past";
+                return;
+            }
+            
+            if (date > DateTime.Today.AddYears(2))
+            {
+                returnDateError = "Return date cannot be more than 2 years in the future";
+                return;
+            }
+            
+            if (date <= newDate.OutboundDate)
+            {
+                returnDateError = "Return date must be after outbound date";
+                return;
+            }
+            
+            newDate.ReturnDate = date;
+        }
+        else
+        {
+            returnDateError = "Invalid date format";
+        }
+    }
+
+    // Autocomplete methods
+    private void OnSearchFocusIn()
+    {
+        if (!string.IsNullOrWhiteSpace(searchQuery))
+        {
+            showDropdown = true;
+        }
+    }
+
+    private void OnSearchInput(ChangeEventArgs e)
+    {
+        searchQuery = e.Value?.ToString() ?? "";
+        DebouncedSearch();
+    }
+
+    private void DebouncedSearch()
+    {
+        _debounceTimer?.Dispose();
+        _debounceTimer = new System.Threading.Timer(async _ =>
+        {
+            await InvokeAsync(async () =>
+            {
+                await PerformSearch();
+                StateHasChanged();
+            });
+        }, null, DebounceDelayMs, Timeout.Infinite);
+    }
+
+    private async Task PerformSearch()
+    {
+        if (string.IsNullOrWhiteSpace(searchQuery))
+        {
+            filteredAirports.Clear();
+            showDropdown = false;
+            return;
+        }
+
+        if (searchQuery.Length < 2)
+        {
+            showDropdown = false;
+            return;
+        }
+
+        // Search using cached service
+        var results = await AirportCacheService.SearchDestinationsAsync(searchQuery, maxResults: 10);
+        
+        // Filter out already selected
+        filteredAirports = results
+            .Where(a => !selectedDestinations.Any(s => s.Id == a.Id))
+            .ToList();
+        
+        showDropdown = true;
+    }
+
+    private void SelectAirport(Destination airport)
+    {
+        if (!selectedDestinations.Any(d => d.Id == airport.Id))
+        {
+            selectedDestinations.Add(airport);
+        }
+        
+        searchQuery = "";
+        filteredAirports.Clear();
+        showDropdown = false;
+        StateHasChanged();
+    }
+
+    private void RemoveDestination(int destId)
+    {
+        selectedDestinations.RemoveAll(d => d.Id == destId);
+        StateHasChanged();
+    }
+
+    public void Dispose()
+    {
+        _debounceTimer?.Dispose();
     }
 
     // Model for form binding
