@@ -54,26 +54,6 @@ dotnet test --filter "FullyQualifiedName~UIValidationTests"
 
 ---
 
-### 4. **Shell Validation Script** (Post-Deployment)
-**Location:** `validate-ui.sh`
-
-**What it checks:**
-- Application responds (HTTP health check)
-- Home page loads
-- Manage Dates page loads
-- Blazor framework present
-- UI elements exist ("Add New Date", etc.)
-- Docker logs for errors
-
-**Run:**
-```bash
-./validate-ui.sh
-# Or for custom URL:
-./validate-ui.sh http://localhost:8080
-```
-
----
-
 ## 🔄 Recommended Workflow
 
 ### **Before Committing:**
@@ -90,8 +70,8 @@ dotnet test --collect:"XPlat Code Coverage"
 # 1. Start container
 docker compose up -d
 
-# 2. Run validation script
-./validate-ui.sh
+# 2. Run UI validation tests
+dotnet test --filter "UIValidationTests"
 
 # 3. Check logs for errors
 docker logs flight-tracker 2>&1 | grep -i "error\|exception" | grep -v "HSTS\|DataProtection"
@@ -133,7 +113,7 @@ docker logs flight-tracker 2>&1 | grep -i "error\|exception" | grep -v "HSTS\|Da
 |-------|---------|--------|
 | Unit Tests | 11 | 20+ |
 | Integration Tests | 11 | 15+ |
-| UI Validation | 6 | 10+ |
+| UI Validation | 7 | 10+ |
 
 ---
 
@@ -191,31 +171,25 @@ public async Task Page_ShouldHave_CriticalElement()
 
 ## 🎯 Future Enhancements
 
-1. **Playwright/Selenium Tests**
-   - Full browser automation
-   - Interactive UI testing
-   - Screenshot comparison
-
-2. **Visual Regression Testing**
+1. **Visual Regression Testing**
    - Percy.io or similar
    - Catch unexpected UI changes
 
-3. **Load Testing**
+2. **Load Testing**
    - k6 or Apache Bench
    - Test under concurrent users
 
-4. **API Integration Tests**
-   - Test BookingCom provider
-   - Mock API responses
+3. **API Integration Tests**
+   - Test BookingCom provider with real API
+   - Mock API responses for CI/CD
 
 ---
 
 ## ✅ Pre-Deployment Checklist
 
-- [ ] All unit tests pass
-- [ ] All integration tests pass
-- [ ] UI validation tests pass
-- [ ] `validate-ui.sh` succeeds
+- [ ] All unit tests pass (11 tests)
+- [ ] All integration tests pass (11 tests)
+- [ ] UI validation tests pass (7 tests)
 - [ ] No errors in Docker logs
 - [ ] Manual smoke test of critical paths
 - [ ] Code reviewed (self or peer)
