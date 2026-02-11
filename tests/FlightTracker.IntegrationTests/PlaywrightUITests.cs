@@ -46,6 +46,10 @@ public class PlaywrightUITests : IAsyncLifetime
         {
             // Navigate to home page
             await page.GotoAsync(BaseUrl);
+            await page.WaitForLoadStateAsync(LoadState.NetworkIdle);
+            
+            // Wait for Blazor to hydrate
+            await page.WaitForTimeoutAsync(2000);
             
             // Verify page loaded
             var title = await page.TitleAsync();
@@ -76,6 +80,7 @@ public class PlaywrightUITests : IAsyncLifetime
             
             // Wait for Blazor to hydrate
             await page.WaitForLoadStateAsync(LoadState.NetworkIdle);
+            await page.WaitForTimeoutAsync(2000);
             
             // Verify title
             var title = await page.TitleAsync();
@@ -109,18 +114,22 @@ public class PlaywrightUITests : IAsyncLifetime
             await page.GotoAsync($"{BaseUrl}/manage-dates");
             await page.WaitForLoadStateAsync(LoadState.NetworkIdle);
             
+            // Wait for Blazor to hydrate (SignalR connection)
+            await page.WaitForTimeoutAsync(2000);
+            
             // Click Add New Date button
             var addButton = page.Locator("button:has-text('Add New Date')");
             await addButton.ClickAsync();
             
             // Wait for form to appear
-            await page.WaitForSelectorAsync("text=Destinations");
+            await page.WaitForSelectorAsync("text=Destinations", new() { Timeout = 5000 });
             
             // Verify form fields exist
             var nameInput = page.Locator("input[placeholder*='Easter Weekend']");
             Assert.True(await nameInput.IsVisibleAsync());
             
-            var destinationSearch = page.Locator("input[placeholder*='Search airport']");
+            // Fixed placeholder selector to match actual text
+            var destinationSearch = page.Locator("input[placeholder*='Type to search airports']");
             Assert.True(await destinationSearch.IsVisibleAsync());
         }
         finally
@@ -139,21 +148,26 @@ public class PlaywrightUITests : IAsyncLifetime
             await page.GotoAsync($"{BaseUrl}/manage-dates");
             await page.WaitForLoadStateAsync(LoadState.NetworkIdle);
             
+            // Wait for Blazor to hydrate
+            await page.WaitForTimeoutAsync(2000);
+            
             // Open add form
             await page.ClickAsync("button:has-text('Add New Date')");
-            await page.WaitForSelectorAsync("input[placeholder*='Search airport']");
+            
+            // Fixed placeholder selector
+            var searchBox = page.Locator("input[placeholder*='Type to search airports']");
+            await searchBox.WaitForAsync(new() { State = WaitForSelectorState.Visible, Timeout = 5000 });
             
             // Type in autocomplete
-            var searchBox = page.Locator("input[placeholder*='Search airport']");
             await searchBox.ClickAsync();
             await searchBox.FillAsync("ber");
             
             // Wait for debounce (300ms) + network
-            await page.WaitForTimeoutAsync(500);
+            await page.WaitForTimeoutAsync(1000);
             
             // Verify dropdown appears with results
             var dropdown = page.Locator(".autocomplete-dropdown");
-            await dropdown.WaitForAsync(new() { State = WaitForSelectorState.Visible, Timeout = 2000 });
+            await dropdown.WaitForAsync(new() { State = WaitForSelectorState.Visible, Timeout = 3000 });
             
             // Verify "Berlin" appears in results
             var berlinOption = page.Locator(".autocomplete-item:has-text('Berlin')");
@@ -175,16 +189,23 @@ public class PlaywrightUITests : IAsyncLifetime
             await page.GotoAsync($"{BaseUrl}/manage-dates");
             await page.WaitForLoadStateAsync(LoadState.NetworkIdle);
             
+            // Wait for Blazor to hydrate
+            await page.WaitForTimeoutAsync(2000);
+            
             // Open add form
             await page.ClickAsync("button:has-text('Add New Date')");
             
+            // Fixed placeholder selector
+            var searchBox = page.Locator("input[placeholder*='Type to search airports']");
+            await searchBox.WaitForAsync(new() { State = WaitForSelectorState.Visible, Timeout = 5000 });
+            
             // Search and select destination
-            var searchBox = page.Locator("input[placeholder*='Search airport']");
             await searchBox.FillAsync("berlin");
-            await page.WaitForTimeoutAsync(500);
+            await page.WaitForTimeoutAsync(1000);
             
             // Click on Berlin option
             await page.ClickAsync(".autocomplete-item:has-text('Berlin')");
+            await page.WaitForTimeoutAsync(500);
             
             // Verify chip appears
             var chip = page.Locator(".badge:has-text('BER')");
@@ -210,12 +231,20 @@ public class PlaywrightUITests : IAsyncLifetime
             await page.GotoAsync($"{BaseUrl}/manage-dates");
             await page.WaitForLoadStateAsync(LoadState.NetworkIdle);
             
+            // Wait for Blazor to hydrate
+            await page.WaitForTimeoutAsync(2000);
+            
             // Add a destination
             await page.ClickAsync("button:has-text('Add New Date')");
-            var searchBox = page.Locator("input[placeholder*='Search airport']");
+            
+            // Fixed placeholder selector
+            var searchBox = page.Locator("input[placeholder*='Type to search airports']");
+            await searchBox.WaitForAsync(new() { State = WaitForSelectorState.Visible, Timeout = 5000 });
+            
             await searchBox.FillAsync("paris");
-            await page.WaitForTimeoutAsync(500);
+            await page.WaitForTimeoutAsync(1000);
             await page.ClickAsync(".autocomplete-item:has-text('Paris')");
+            await page.WaitForTimeoutAsync(500);
             
             // Verify chip exists
             var chip = page.Locator(".badge:has-text('CDG')");
@@ -225,7 +254,7 @@ public class PlaywrightUITests : IAsyncLifetime
             await chip.Locator(".btn-close-chip").ClickAsync();
             
             // Verify chip is gone
-            await page.WaitForTimeoutAsync(300);
+            await page.WaitForTimeoutAsync(500);
             Assert.False(await chip.IsVisibleAsync());
         }
         finally
@@ -244,13 +273,16 @@ public class PlaywrightUITests : IAsyncLifetime
             await page.GotoAsync($"{BaseUrl}/manage-dates");
             await page.WaitForLoadStateAsync(LoadState.NetworkIdle);
             
+            // Wait for Blazor to hydrate
+            await page.WaitForTimeoutAsync(2000);
+            
             // Click Edit on first travel date (if exists)
             var editButton = page.Locator("button:has-text('Edit')").First;
             
             if (await editButton.IsVisibleAsync())
             {
                 await editButton.ClickAsync();
-                await page.WaitForTimeoutAsync(300);
+                await page.WaitForTimeoutAsync(1000);
                 
                 // Verify destination chips are loaded
                 var chips = page.Locator(".destination-chips .badge");
@@ -277,17 +309,24 @@ public class PlaywrightUITests : IAsyncLifetime
             await page.GotoAsync(BaseUrl);
             await page.WaitForLoadStateAsync(LoadState.NetworkIdle);
             
+            // Wait for Blazor to hydrate
+            await page.WaitForTimeoutAsync(2000);
+            
             // Click Manage Dates in nav
             await page.ClickAsync("a[href='manage-dates']");
-            await page.WaitForLoadStateAsync(LoadState.NetworkIdle);
+            
+            // Wait for navigation and title change
+            await page.WaitForFunctionAsync("document.title === 'Manage Travel Dates'", null, new() { Timeout = 5000 });
             
             // Verify we're on the right page
             var title = await page.TitleAsync();
             Assert.Equal("Manage Travel Dates", title);
             
             // Go back to home
-            await page.ClickAsync("a[href='']:has-text('Home')");
-            await page.WaitForLoadStateAsync(LoadState.NetworkIdle);
+            await page.ClickAsync("a[href=''].nav-link:has-text('Home')");
+            
+            // Wait for navigation and title change
+            await page.WaitForFunctionAsync("document.title === 'Flight Tracker'", null, new() { Timeout = 5000 });
             
             title = await page.TitleAsync();
             Assert.Equal("Flight Tracker", title);
