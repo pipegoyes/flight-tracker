@@ -54,6 +54,30 @@ dotnet test --filter "FullyQualifiedName~UIValidationTests"
 
 ---
 
+### 4. **Playwright UI Tests** (Browser Automation) 🎭
+**Location:** `tests/FlightTracker.IntegrationTests/PlaywrightUITests.cs`
+
+**Coverage:**
+- Button clicks work
+- Form interactions (typing, selecting)
+- Autocomplete dropdown behavior
+- Destination chip add/remove
+- Navigation between pages
+- JavaScript errors
+- Real browser testing (Chromium)
+
+**Setup Required:**
+See [PLAYWRIGHT_SETUP.md](PLAYWRIGHT_SETUP.md) for installation instructions.
+
+**Run:**
+```bash
+dotnet test --filter "FullyQualifiedName~PlaywrightUITests"
+```
+
+**Note:** Requires Chromium browser + system dependencies. Optional for development.
+
+---
+
 ## 🔄 Recommended Workflow
 
 ### **Before Committing:**
@@ -112,8 +136,10 @@ docker logs flight-tracker 2>&1 | grep -i "error\|exception" | grep -v "HSTS\|Da
 | Layer | Current | Target |
 |-------|---------|--------|
 | Unit Tests | 11 | 20+ |
-| Integration Tests | 11 | 15+ |
-| UI Validation | 7 | 10+ |
+| Integration Tests | 18 | 20+ |
+| UI Validation (HTTP) | 7 | 10+ |
+| UI Automation (Playwright) | 9 | 15+ |
+| **Total** | **45** | **65+** |
 
 ---
 
@@ -171,29 +197,44 @@ public async Task Page_ShouldHave_CriticalElement()
 
 ## 🎯 Future Enhancements
 
-1. **Visual Regression Testing**
-   - Percy.io or similar
-   - Catch unexpected UI changes
+1. **Screenshot Comparison** (Using Playwright)
+   - Automated visual regression testing
+   - Catch unintended UI changes
+   - Compare baseline screenshots
 
 2. **Load Testing**
    - k6 or Apache Bench
    - Test under concurrent users
+   - Identify performance bottlenecks
 
 3. **API Integration Tests**
    - Test BookingCom provider with real API
    - Mock API responses for CI/CD
+   - Rate limiting tests
+
+4. **More Playwright Scenarios**
+   - Complete user journeys (add → edit → delete → restore)
+   - Error handling flows
+   - Mobile viewport testing
 
 ---
 
 ## ✅ Pre-Deployment Checklist
 
 - [ ] All unit tests pass (11 tests)
-- [ ] All integration tests pass (11 tests)
+- [ ] All integration tests pass (18 tests)
 - [ ] UI validation tests pass (7 tests)
+- [ ] Playwright tests pass (9 tests) - *optional if Chromium not installed*
 - [ ] No errors in Docker logs
 - [ ] Manual smoke test of critical paths
 - [ ] Code reviewed (self or peer)
 - [ ] Documentation updated
+
+**Quick check (without Playwright):**
+```bash
+dotnet test --filter "FullyQualifiedName!~PlaywrightUITests"
+# Should show: 36/36 tests passed
+```
 
 ---
 
