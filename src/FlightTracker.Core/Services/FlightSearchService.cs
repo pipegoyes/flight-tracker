@@ -226,4 +226,122 @@ public class FlightSearchService
 
         return successCount;
     }
+
+    /// <summary>
+    /// Check prices for a specific target date on-demand.
+    /// Uses cached prices if available within the maxAgeHours window, otherwise fetches fresh prices.
+    /// </summary>
+    /// <param name="originAirportCode">Origin airport (e.g., "FRA")</param>
+    /// <param name="targetDateId">Target date ID</param>
+    /// <param name="maxAgeHours">Maximum age of cached prices in hours (default: 6 hours)</param>
+    /// <returns>Tuple of (cachedCount, fetchedCount, totalResults)</returns>
+    public async Task<(int cachedCount, int fetchedCount, IEnumerable<PriceCheck> results)> CheckPricesForTargetDateAsync(
+        string originAirportCode,
+        int targetDateId,
+        int maxAgeHours = 6,
+        CancellationToken cancellationToken = default)
+    {
+        var cachedCount = 0;
+        var fetchedCount = 0;
+        var results = new List<PriceCheck>();
+
+        // Get target date
+        var targetDate = await _targetDateRepository.GetByIdAsync(targetDateId, cancellationToken);
+        if (targetDate == null)
+        {
+            _logger.LogWarning("Target date {Id} not found", targetDateId);
+            return (0, 0, results);
+        }
+
+        // Get destinations for this target date
+        var destinations = await _targetDateRepository.GetDestinationsAsync(
+            targetDateId,
+            cancellationToken);
+
+        var destinationsList = destinations.ToList();
+
+        if (!destinationsList.Any())
+        {
+            _logger.LogWarning(
+                "No destinations configured for target date: {DateName}",
+                targetDate.Name);
+            return (0, 0, results);
+        }
+
+        _logger.LogInformation(
+            "Checking prices for {DateName}: {DestCount} destination(s), max age: {MaxAge}h",
+            targetDate.Name,
+            destinationsList.Count,
+            maxAgeHours);
+
+        foreach (var destination in destinationsList)
+        {
+            try
+            {
+                // Check if we have a recent price
+                var recentPrice = await _priceCheckRepository.GetRecentPriceAsync(
+                    targetDateId,
+                    destination.Id,
+                    maxAgeHours,
+                    cancellationToken);
+
+                if (recentPrice != null)
+                {
+                    // Use cached price
+                    _logger.LogInformation(
+                        "Using cached price for {Destination}: {Price} {Currency} (age: {Age:F1}h)",
+                        destination.Name,
+                        recentPrice.Price,
+                        recentPrice.Currency,
+                        (DateTime.UtcNow - recentPrice.CheckTimestamp).TotalHours);
+
+                    results.Add(recentPrice);
+                    cachedCount++;
+                }
+                else
+                {
+                    // Fetch fresh price
+                    _logger.LogInformation(
+                        "Fetching fresh price for {Destination}",
+                        destination.Name);
+
+                    var freshPrice = await SearchAndSaveFlightAsync(
+                        originAirportCode,
+                        destination.AirportCode,
+                        targetDate.OutboundDate,
+                        targetDate.ReturnDate,
+                        cancellationToken);
+
+                    if (freshPrice != null)
+                    {
+                        results.Add(freshPrice);
+                        fetchedCount++;
+                    }
+
+                    // Rate limiting: delay between API calls
+                    if (fetchedCount > 0)
+                    {
+                        await Task.Delay(2000, cancellationToken);
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(
+                    ex,
+                    "Failed to check price for {Origin} -> {Destination}",
+                    originAirportCode,
+                    destination.AirportCode);
+            }
+        }
+
+        _logger.LogInformation(
+            "Price check complete for {DateName}: {Cached} cached, {Fetched} fetched, {Total} total",
+            targetDate.Name,
+            cachedCount,
+            fetchedCount,
+            results.Count);
+
+        return (cachedCount, fetchedCount, results);
+    }
 }

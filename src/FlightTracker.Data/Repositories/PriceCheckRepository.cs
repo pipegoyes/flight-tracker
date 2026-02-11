@@ -86,4 +86,22 @@ public class PriceCheckRepository : Repository<PriceCheck>, IPriceCheckRepositor
         _dbSet.RemoveRange(oldRecords);
         return await _context.SaveChangesAsync(cancellationToken);
     }
+
+    public async Task<PriceCheck?> GetRecentPriceAsync(
+        int targetDateId,
+        int destinationId,
+        int maxAgeHours,
+        CancellationToken cancellationToken = default)
+    {
+        var cutoffTime = DateTime.UtcNow.AddHours(-maxAgeHours);
+
+        return await _dbSet
+            .Where(p => p.TargetDateId == targetDateId &&
+                       p.DestinationId == destinationId &&
+                       p.CheckTimestamp >= cutoffTime)
+            .OrderByDescending(p => p.CheckTimestamp)
+            .Include(p => p.TargetDate)
+            .Include(p => p.Destination)
+            .FirstOrDefaultAsync(cancellationToken);
+    }
 }
