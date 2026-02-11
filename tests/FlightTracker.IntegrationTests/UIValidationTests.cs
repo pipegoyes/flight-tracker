@@ -99,6 +99,7 @@ public class UIValidationTests : IClassFixture<WebApplicationFactory<Program>>
 
         // Assert - Check for Blazor Server rendering markers
         Assert.Contains("blazor.web.js", content);
-        Assert.Contains("type=\"server\"", content); // Blazor server component marker
+        // Blazor server mode is indicated by JSON in the HTML comment: <!--Blazor:{"type":"server",...}-->
+        Assert.Contains("\"type\":\"server\"", content); // Blazor server component marker
     }
 }
