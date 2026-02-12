@@ -35,8 +35,14 @@ public static class DataSeeder
         await context.SaveChangesAsync();
     }
 
-    public static async Task SeedHistoricalPriceDataAsync(FlightTrackerDbContext context)
+    public static async Task SeedHistoricalPriceDataAsync(FlightTrackerDbContext context, bool enabled = true)
     {
+        if (!enabled)
+        {
+            Console.WriteLine("[SEED] Historical price seeding is disabled");
+            return;
+        }
+
         // Get all destinations and target dates
         var destinations = await context.Destinations.ToListAsync();
         var targetDates = await context.TargetDates.ToListAsync();

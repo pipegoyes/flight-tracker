@@ -92,6 +92,17 @@ jobs:
         with:
           creds: ${{ secrets.AZURE_CREDENTIALS }}
 
+      - name: Configure App Service settings
+        run: |
+          az webapp config appsettings set \
+            --name ${{ secrets.AZURE_WEBAPP_NAME }} \
+            --resource-group ${{ secrets.AZURE_RESOURCE_GROUP }} \
+            --settings \
+              "Sentry__Dsn=${{ secrets.SENTRY_DSN }}" \
+              "FlightProvider__ApiKey=${{ secrets.FLIGHT_PROVIDER_API_KEY }}" \
+              "FlightProvider__ApiHost=${{ secrets.FLIGHT_PROVIDER_API_HOST }}" \
+              "FlightProvider__Type=${{ secrets.FLIGHT_PROVIDER_TYPE }}"
+
       - name: Deploy to Azure Web App
         id: deploy
         uses: azure/webapps-deploy@v2

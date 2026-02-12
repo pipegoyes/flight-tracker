@@ -31,6 +31,9 @@ builder.Services.AddRazorComponents()
 builder.Services.Configure<AppConfig>(
     builder.Configuration.GetSection("FlightTracker"));
 
+builder.Services.Configure<SeedingConfig>(
+    builder.Configuration.GetSection("Seeding"));
+
 // Configure database
 var connectionString = builder.Configuration.GetConnectionString("FlightTracker")
     ?? "Data Source=flighttracker.db";
@@ -127,6 +130,8 @@ using (var scope = app.Services.CreateScope())
     {
         var context = services.GetRequiredService<FlightTrackerDbContext>();
         var configService = services.GetRequiredService<ConfigurationService>();
+        var seedingConfig = builder.Configuration.GetSection("Seeding").Get<SeedingConfig>() ?? new SeedingConfig();
+        var logger = services.GetRequiredService<ILogger<Program>>();
         
         // Create database if it doesn't exist
         context.Database.EnsureCreated();
@@ -134,20 +139,22 @@ using (var scope = app.Services.CreateScope())
         // Seed comprehensive airport list first
         await DataSeeder.SeedAirportsAsync(context);
         
-        // Sync configuration with database
-        await configService.InitializeAllAsync();
+        // Sync configuration with database (respects SeedDemoTravelDates flag)
+        await configService.InitializeAllAsync(seedingConfig.SeedDemoTravelDates);
         
-        // Seed historical price data for testing (only if database is empty)
+        // Seed historical price data for testing (only if database is empty and enabled)
         var hasPriceData = await context.PriceChecks.AnyAsync();
-        if (!hasPriceData)
+        if (!hasPriceData && seedingConfig.SeedHistoricalPrices)
         {
-            await DataSeeder.SeedHistoricalPriceDataAsync(context);
-            var logger = services.GetRequiredService<ILogger<Program>>();
+            await DataSeeder.SeedHistoricalPriceDataAsync(context, seedingConfig.SeedHistoricalPrices);
             logger.LogInformation("Seeded historical price data for testing");
         }
+        else if (!seedingConfig.SeedHistoricalPrices)
+        {
+            logger.LogInformation("Historical price seeding is disabled");
+        }
         
-        var logger2 = services.GetRequiredService<ILogger<Program>>();
-        logger2.LogInformation("Database initialized successfully");
+        logger.LogInformation("Database initialized successfully");
     }
     catch (Exception ex)
     {
