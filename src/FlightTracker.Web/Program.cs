@@ -40,6 +40,12 @@ var connectionString = builder.Configuration.GetConnectionString("FlightTracker"
 builder.Services.AddDbContext<FlightTrackerDbContext>(options =>
     options.UseSqlite(connectionString));
 
+// Add health checks
+builder.Services.AddHealthChecks()
+    .AddDbContextCheck<FlightTrackerDbContext>(
+        name: "database",
+        tags: new[] { "db", "sqlite" });
+
 // Register repositories
 builder.Services.AddScoped<IDestinationRepository, DestinationRepository>();
 builder.Services.AddScoped<ITargetDateRepository, TargetDateRepository>();
@@ -121,6 +127,34 @@ app.UseAntiforgery();
 
 app.MapRazorComponents<App>()
     .AddInteractiveServerRenderMode();
+
+// Map health check endpoints
+app.MapHealthChecks("/health", new Microsoft.AspNetCore.Diagnostics.HealthChecks.HealthCheckOptions
+{
+    ResponseWriter = async (context, report) =>
+    {
+        context.Response.ContentType = "application/json";
+        var result = System.Text.Json.JsonSerializer.Serialize(new
+        {
+            status = report.Status.ToString(),
+            checks = report.Entries.Select(e => new
+            {
+                name = e.Key,
+                status = e.Value.Status.ToString(),
+                description = e.Value.Description,
+                duration = e.Value.Duration.TotalMilliseconds
+            }),
+            totalDuration = report.TotalDuration.TotalMilliseconds
+        });
+        await context.Response.WriteAsync(result);
+    }
+});
+
+// Simple liveness endpoint (no DB check)
+app.MapHealthChecks("/health/live", new Microsoft.AspNetCore.Diagnostics.HealthChecks.HealthCheckOptions
+{
+    Predicate = _ => false // No health checks, just returns 200 if app is running
+});
 
 // Initialize database and configuration at startup
 using (var scope = app.Services.CreateScope())
