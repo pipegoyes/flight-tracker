@@ -1,0 +1,25 @@
+#!/bin/bash
+# GitHub Secrets Setup Guide
+# Run commands manually - this is just a reference
+
+echo "=== STEP 1: Environment Secrets (production) ==="
+echo ""
+echo "Go to: https://github.com/pipegoyes/flight-tracker/settings/environments"
+echo "Click on: production"
+echo "Add these environment secrets:"
+echo ""
+echo "1. SENTRY_DSN (✅ Already added)"
+echo ""
+echo "2. FLIGHT_PROVIDER_TYPE"
+echo "   Value: BookingCom"
+echo ""
+echo "3. FLIGHT_PROVIDER_API_KEY"
+echo "   Value: e4256d3703msh7da218ad93c15bep103962jsnd7a711defff2"
+echo ""
+echo "4. FLIGHT_PROVIDER_API_HOST"
+echo "   Value: booking-com15.p.rapidapi.com"
+echo ""
+echo "=== STEP 2: Deploy Azure Infrastructure with Terraform ==="
+echo ""
+echo "We need to deploy Azure resources first to get the values for repository secrets"
+echo ""

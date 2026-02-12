@@ -83,7 +83,7 @@ jobs:
     runs-on: ubuntu-latest
     needs: build-and-push-docker
     environment:
-      name: production
+      name: Prod
       url: ${{ steps.deploy.outputs.webapp-url }}
     
     steps:
