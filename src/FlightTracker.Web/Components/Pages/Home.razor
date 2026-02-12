@@ -31,15 +31,60 @@
         <div class="card mb-4">
             <div class="card-body">
                 <h5 class="card-title">Select Travel Dates</h5>
-                <select class="form-select" @onchange="OnTargetDateChanged">
-                    <option value="">-- Select a date range --</option>
-                    @foreach (var date in targetDates)
-                    {
-                        <option value="@date.Id" selected="@(date.Id == selectedTargetDateId)">
-                            @date.Name (@date.OutboundDate.ToString("MMM dd") - @date.ReturnDate.ToString("MMM dd, yyyy"))
-                        </option>
-                    }
-                </select>
+                <div class="row g-2">
+                    <div class="col-md-8">
+                        <select class="form-select" @onchange="OnTargetDateChanged">
+                            <option value="">-- Select a date range --</option>
+                            @foreach (var date in targetDates)
+                            {
+                                <option value="@date.Id" selected="@(date.Id == selectedTargetDateId)">
+                                    @date.Name (@date.OutboundDate.ToString("MMM dd") - @date.ReturnDate.ToString("MMM dd, yyyy"))
+                                </option>
+                            }
+                        </select>
+                    </div>
+                    <div class="col-md-4">
+                        <button class="btn btn-success w-100" 
+                                @onclick="CheckPricesNow" 
+                                disabled="@(!selectedTargetDateId.HasValue || isCheckingPrices)">
+                            @if (isCheckingPrices)
+                            {
+                                <span class="spinner-border spinner-border-sm me-2" role="status"></span>
+                                <span>Checking...</span>
+                            }
+                            else
+                            {
+                                <span>🔄 Check Prices Now</span>
+                            }
+                        </button>
+                    </div>
+                </div>
+                @if (isCheckingPrices && checkProgress != null)
+                {
+                    <div class="mt-3">
+                        <div class="d-flex justify-content-between mb-1">
+                            <small class="text-muted">@checkProgress.StatusText</small>
+                            <small class="text-muted">@checkProgress.Current / @checkProgress.Total</small>
+                        </div>
+                        <div class="progress" style="height: 8px;">
+                            <div class="progress-bar progress-bar-striped progress-bar-animated" 
+                                 role="progressbar" 
+                                 style="width: @(checkProgress.PercentComplete)%"
+                                 aria-valuenow="@checkProgress.Current" 
+                                 aria-valuemin="0" 
+                                 aria-valuemax="@checkProgress.Total">
+                            </div>
+                        </div>
+                    </div>
+                }
+                @if (!isCheckingPrices && lastCheckResult != null)
+                {
+                    <div class="mt-2">
+                        <small class="text-muted">
+                            @lastCheckResult
+                        </small>
+                    </div>
+                }
             </div>
         </div>
 
@@ -121,7 +166,18 @@
     private List<PriceCheck> priceChecks = new();
     private int? selectedTargetDateId;
     private bool isLoading = true;
+    private bool isCheckingPrices = false;
     private string? errorMessage;
+    private string? lastCheckResult;
+    private CheckProgressInfo? checkProgress;
+
+    private class CheckProgressInfo
+    {
+        public int Current { get; set; }
+        public int Total { get; set; }
+        public string StatusText { get; set; } = "";
+        public int PercentComplete => Total > 0 ? (Current * 100) / Total : 0;
+    }
 
     protected override async Task OnInitializedAsync()
     {
@@ -181,6 +237,75 @@
         finally
         {
             isLoading = false;
+        }
+    }
+
+    private async Task CheckPricesNow()
+    {
+        if (!selectedTargetDateId.HasValue)
+            return;
+
+        try
+        {
+            isCheckingPrices = true;
+            lastCheckResult = null;
+            errorMessage = null;
+            checkProgress = null;
+
+            // Create progress reporter
+            var progressReporter = new Progress<(int current, int total, string destinationName, bool isCached)>(update =>
+            {
+                var (current, total, destinationName, isCached) = update;
+                var action = isCached ? "✓ Cached" : "🔄 Checking";
+                
+                checkProgress = new CheckProgressInfo
+                {
+                    Current = current,
+                    Total = total,
+                    StatusText = $"{action}: {destinationName}"
+                };
+                
+                // Trigger UI update
+                InvokeAsync(StateHasChanged);
+            });
+
+            // Call the on-demand price check (6 hour cache)
+            var (cachedCount, fetchedCount, results) = await FlightSearchService.CheckPricesForTargetDateAsync(
+                "FRA", // Origin airport
+                selectedTargetDateId.Value,
+                maxAgeHours: 6,
+                progress: progressReporter);
+
+            // Update the prices
+            priceChecks = results.ToList();
+
+            // Show result message
+            if (fetchedCount > 0 && cachedCount > 0)
+            {
+                lastCheckResult = $"✅ Updated! {fetchedCount} new price(s) fetched, {cachedCount} cached.";
+            }
+            else if (fetchedCount > 0)
+            {
+                lastCheckResult = $"✅ Success! Fetched {fetchedCount} new price(s).";
+            }
+            else if (cachedCount > 0)
+            {
+                lastCheckResult = $"ℹ️ All prices are recent (cached {cachedCount} result(s), checked within last 6 hours).";
+            }
+            else
+            {
+                lastCheckResult = "⚠️ No prices found for selected destinations.";
+            }
+        }
+        catch (Exception ex)
+        {
+            errorMessage = $"Failed to check prices: {ex.Message}";
+            lastCheckResult = null;
+        }
+        finally
+        {
+            isCheckingPrices = false;
+            checkProgress = null;
         }
     }
 

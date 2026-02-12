@@ -95,8 +95,14 @@ public class ConfigurationService
     /// Initialize database with target dates from configuration.
     /// Creates missing date ranges, updates existing ones.
     /// </summary>
-    public async Task InitializeTargetDatesAsync(CancellationToken cancellationToken = default)
+    public async Task InitializeTargetDatesAsync(bool seedDemoData = true, CancellationToken cancellationToken = default)
     {
+        if (!seedDemoData)
+        {
+            _logger.LogInformation("Demo travel date seeding is disabled - skipping target dates from configuration");
+            return;
+        }
+
         _logger.LogInformation("Initializing target dates from configuration...");
 
         foreach (var dateConfig in _config.TargetDates)
@@ -161,10 +167,10 @@ public class ConfigurationService
     /// Initialize both destinations and target dates from configuration.
     /// Should be called at application startup.
     /// </summary>
-    public async Task InitializeAllAsync(CancellationToken cancellationToken = default)
+    public async Task InitializeAllAsync(bool seedDemoData = true, CancellationToken cancellationToken = default)
     {
         await InitializeDestinationsAsync(cancellationToken);
-        await InitializeTargetDatesAsync(cancellationToken);
+        await InitializeTargetDatesAsync(seedDemoData, cancellationToken);
     }
 
     /// <summary>

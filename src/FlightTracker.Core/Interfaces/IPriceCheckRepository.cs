@@ -45,4 +45,14 @@ public interface IPriceCheckRepository : IRepository<PriceCheck>
     Task<int> DeleteOlderThanAsync(
         DateTime cutoffDate,
         CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Check if we have a recent price check for a specific target date and destination.
+    /// "Recent" is defined by the maxAgeHours parameter.
+    /// </summary>
+    Task<PriceCheck?> GetRecentPriceAsync(
+        int targetDateId,
+        int destinationId,
+        int maxAgeHours,
+        CancellationToken cancellationToken = default);
 }

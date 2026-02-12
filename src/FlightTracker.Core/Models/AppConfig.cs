@@ -22,6 +22,24 @@ public class AppConfig
 }
 
 /// <summary>
+/// Configuration for data seeding behavior.
+/// </summary>
+public class SeedingConfig
+{
+    /// <summary>
+    /// Enable automatic seeding of demo travel dates (Rheinland-Pfalz holidays).
+    /// Should be disabled in production.
+    /// </summary>
+    public bool SeedDemoTravelDates { get; set; } = true;
+
+    /// <summary>
+    /// Enable automatic seeding of historical price data for demo.
+    /// Should be disabled in production.
+    /// </summary>
+    public bool SeedHistoricalPrices { get; set; } = true;
+}
+
+/// <summary>
 /// Configuration for a destination airport.
 /// </summary>
 public class DestinationConfig
