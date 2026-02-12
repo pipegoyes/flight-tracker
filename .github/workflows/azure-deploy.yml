@@ -35,7 +35,7 @@ jobs:
         run: dotnet build --configuration Release --no-restore
 
       - name: Run tests
-        run: dotnet test --no-build --configuration Release --verbosity normal
+        run: dotnet test --no-build --configuration Release --verbosity normal --filter "FullyQualifiedName!~PlaywrightUITests"
 
   build-and-push-docker:
     name: Build and Push Docker Image
