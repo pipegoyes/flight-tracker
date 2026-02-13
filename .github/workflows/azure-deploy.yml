@@ -113,7 +113,7 @@ jobs:
         uses: azure/webapps-deploy@v2
         with:
           app-name: ${{ steps.discover.outputs.webapp_name }}
-          images: ${{ secrets.ACR_LOGIN_SERVER }}/${{ env.DOCKER_IMAGE_NAME }}:latest
+          images: ${{ env.ACR_SERVER }}/${{ env.DOCKER_IMAGE_NAME }}:latest
 
       - name: Restart App Service
         run: |
