@@ -1,5 +1,10 @@
 # Build stage
 FROM mcr.microsoft.com/dotnet/sdk:8.0 AS build
+
+# Accept build arguments for version info
+ARG GIT_COMMIT=unknown
+ARG BUILD_TIME=unknown
+
 WORKDIR /src
 
 # Copy project files for restore (no solution file needed)
@@ -26,6 +31,11 @@ RUN dotnet publish -c Release -o /app/publish /p:UseAppHost=false --no-restore
 
 # Runtime stage
 FROM mcr.microsoft.com/dotnet/aspnet:8.0 AS final
+
+# Re-declare build args for runtime stage
+ARG GIT_COMMIT=unknown
+ARG BUILD_TIME=unknown
+
 WORKDIR /app
 
 # Create data directory for SQLite database
@@ -37,6 +47,8 @@ COPY --from=publish /app/publish .
 # Set environment variables
 ENV ASPNETCORE_URLS=http://+:8080
 ENV ConnectionStrings__FlightTracker="Data Source=/app/data/flighttracker.db"
+ENV APP_VERSION=${GIT_COMMIT}
+ENV APP_BUILD_TIME=${BUILD_TIME}
 
 # Expose port
 EXPOSE 8080
