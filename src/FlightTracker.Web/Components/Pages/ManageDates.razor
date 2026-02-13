@@ -3,9 +3,11 @@
 @using FlightTracker.Core.Entities
 @using FlightTracker.Core.Interfaces
 @using FlightTracker.Core.Services
+@using Microsoft.Extensions.Logging
 @inject ITargetDateRepository TargetDateRepository
 @inject AirportCacheService AirportCacheService
 @inject NavigationManager Navigation
+@inject ILogger<ManageDates> Logger
 
 <PageTitle>Manage Travel Dates</PageTitle>
 
@@ -135,10 +137,19 @@
             }
 
             <div class="d-flex gap-2">
-                <button type="button" class="btn btn-success" @onclick="SaveDate">
-                    <i class="bi bi-check-circle"></i> Save
+                <button type="button" class="btn btn-success" @onclick="SaveDate" disabled="@isSaving">
+                    @if (isSaving)
+                    {
+                        <span class="spinner-border spinner-border-sm me-1" role="status" aria-hidden="true"></span>
+                        <span>Saving...</span>
+                    }
+                    else
+                    {
+                        <i class="bi bi-check-circle"></i>
+                        <span>Save</span>
+                    }
                 </button>
-                <button type="button" class="btn btn-secondary" @onclick="CancelEdit">
+                <button type="button" class="btn btn-secondary" @onclick="CancelEdit" disabled="@isSaving">
                     Cancel
                 </button>
             </div>
@@ -333,6 +344,7 @@
     
     private bool showAddForm = false;
     private bool showDeleted = false;
+    private bool isSaving = false;
     private TargetDate? editingDate = null;
     private string validationMessage = string.Empty;
     private string outboundDateError = string.Empty;
@@ -430,58 +442,91 @@
     private async Task SaveDate()
     {
         validationMessage = string.Empty;
-
-        // Validation
-        if (string.IsNullOrWhiteSpace(newDate.Name))
-        {
-            validationMessage = "Please enter a name for this date range.";
-            return;
-        }
-
-        if (newDate.ReturnDate <= newDate.OutboundDate)
-        {
-            validationMessage = "Return date must be after outbound date.";
-            return;
-        }
-
-        if (!selectedDestinations.Any())
-        {
-            validationMessage = "Please select at least one destination.";
-            return;
-        }
+        isSaving = true;
+        StateHasChanged();
 
         try
         {
+            // Validation
+            if (string.IsNullOrWhiteSpace(newDate.Name))
+            {
+                validationMessage = "Please enter a name for this date range.";
+                return;
+            }
+
+            if (newDate.ReturnDate <= newDate.OutboundDate)
+            {
+                validationMessage = "Return date must be after outbound date.";
+                return;
+            }
+
+            if (!selectedDestinations.Any())
+            {
+                validationMessage = "Please select at least one destination.";
+                return;
+            }
+
+            // Validate destination IDs are valid
+            var destinationIds = selectedDestinations.Select(d => d.Id).ToList();
+            if (destinationIds.Any(id => id <= 0))
+            {
+                Logger.LogWarning("Invalid destination IDs detected: {Ids}", string.Join(", ", destinationIds));
+                validationMessage = "Invalid destination selection. Please remove and re-add destinations.";
+                return;
+            }
+
             if (editingDate == null)
             {
                 // Create new
+                Logger.LogInformation("Creating new travel date: {Name} ({Outbound} - {Return})", 
+                    newDate.Name, newDate.OutboundDate, newDate.ReturnDate);
+
                 var targetDate = new TargetDate
                 {
-                    Name = newDate.Name,
+                    Name = newDate.Name.Trim(),
                     OutboundDate = newDate.OutboundDate,
                     ReturnDate = newDate.ReturnDate
                 };
 
                 var created = await TargetDateRepository.CreateTargetDateAsync(targetDate);
                 
+                if (created.Id <= 0)
+                {
+                    Logger.LogError("Created target date has invalid ID: {Id}", created.Id);
+                    validationMessage = "Failed to create travel date. Please try again.";
+                    return;
+                }
+
+                Logger.LogInformation("Created target date with ID {Id}, adding {Count} destinations", 
+                    created.Id, destinationIds.Count);
+                
                 // Associate destinations
-                await TargetDateRepository.UpdateDestinationsAsync(
-                    created.Id, 
-                    selectedDestinations.Select(d => d.Id));
+                await TargetDateRepository.UpdateDestinationsAsync(created.Id, destinationIds);
+                
+                Logger.LogInformation("Successfully created travel date '{Name}' with {Count} destinations", 
+                    created.Name, destinationIds.Count);
             }
             else
             {
                 // Update existing
-                editingDate.Name = newDate.Name;
+                Logger.LogInformation("Updating travel date ID {Id}: {Name}", editingDate.Id, newDate.Name);
+
+                editingDate.Name = newDate.Name.Trim();
                 editingDate.OutboundDate = newDate.OutboundDate;
                 editingDate.ReturnDate = newDate.ReturnDate;
 
-                await TargetDateRepository.UpdateTargetDateAsync(editingDate);
+                var updated = await TargetDateRepository.UpdateTargetDateAsync(editingDate);
+                if (!updated)
+                {
+                    Logger.LogWarning("Failed to update target date ID {Id}", editingDate.Id);
+                    validationMessage = "Failed to update travel date. It may have been deleted.";
+                    return;
+                }
                 
                 // Update destinations
-                await TargetDateRepository.UpdateDestinationsAsync(
-                    editingDate.Id, 
-                    selectedDestinations.Select(d => d.Id));
+                await TargetDateRepository.UpdateDestinationsAsync(editingDate.Id, destinationIds);
+                
+                Logger.LogInformation("Successfully updated travel date '{Name}'", editingDate.Name);
             }
 
             showAddForm = false;
@@ -491,7 +536,19 @@
         }
         catch (Exception ex)
         {
+            Logger.LogError(ex, "Error saving travel date");
             validationMessage = $"Error saving date: {ex.Message}";
+            
+            // Log inner exception if present
+            if (ex.InnerException != null)
+            {
+                Logger.LogError(ex.InnerException, "Inner exception");
+            }
+        }
+        finally
+        {
+            isSaving = false;
+            StateHasChanged();
         }
     }
 
