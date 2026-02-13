@@ -131,15 +131,36 @@ public class TargetDateRepository : Repository<TargetDate>, ITargetDateRepositor
 
     public async Task UpdateDestinationsAsync(int targetDateId, IEnumerable<int> destinationIds, CancellationToken cancellationToken = default)
     {
-        // Remove existing associations
+        var newDestinationIds = destinationIds.ToHashSet();
+        
+        // Get existing associations
         var existing = await _context.TargetDateDestinations
             .Where(tdd => tdd.TargetDateId == targetDateId)
             .ToListAsync(cancellationToken);
-        
+
+        var existingDestinationIds = existing.Select(e => e.DestinationId).ToHashSet();
+
+        // Find destinations that are being removed
+        var removedDestinationIds = existingDestinationIds.Except(newDestinationIds).ToList();
+
+        // Delete price checks for removed destinations (invalidate old prices)
+        if (removedDestinationIds.Any())
+        {
+            var orphanedPrices = await _context.PriceChecks
+                .Where(p => p.TargetDateId == targetDateId && removedDestinationIds.Contains(p.DestinationId))
+                .ToListAsync(cancellationToken);
+
+            if (orphanedPrices.Any())
+            {
+                _context.PriceChecks.RemoveRange(orphanedPrices);
+            }
+        }
+
+        // Remove existing associations
         _context.TargetDateDestinations.RemoveRange(existing);
 
         // Add new associations
-        var newAssociations = destinationIds.Select(destId => new TargetDateDestination
+        var newAssociations = newDestinationIds.Select(destId => new TargetDateDestination
         {
             TargetDateId = targetDateId,
             DestinationId = destId,

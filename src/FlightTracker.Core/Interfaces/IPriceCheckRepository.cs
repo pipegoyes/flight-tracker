@@ -55,4 +55,21 @@ public interface IPriceCheckRepository : IRepository<PriceCheck>
         int destinationId,
         int maxAgeHours,
         CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Delete all price checks for a specific target date and destination.
+    /// Used when destination associations are changed.
+    /// </summary>
+    Task<int> DeleteByTargetDateAndDestinationAsync(
+        int targetDateId,
+        int destinationId,
+        CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Delete all price checks for a target date that are no longer associated with valid destinations.
+    /// </summary>
+    Task<int> DeleteOrphanedPriceChecksAsync(
+        int targetDateId,
+        IEnumerable<int> validDestinationIds,
+        CancellationToken cancellationToken = default);
 }
