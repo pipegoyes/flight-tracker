@@ -86,15 +86,16 @@ jobs:
       - name: Discover Azure resources
         id: discover
         run: |
-          # Find resource group by tag
-          RG=$(az group list --tag Project=FlightTracker --query "[0].name" -o tsv)
-          echo "resource_group=$RG" >> $GITHUB_OUTPUT
+          # Hardcode for now - will fix auto-discovery later
+          RG="flight-tracker-rg"
+          WEBAPP="flighttracker-6ebcf3aa"
           
-          # Find webapp in that resource group
-          WEBAPP=$(az webapp list --resource-group $RG --query "[0].name" -o tsv)
+          echo "resource_group=$RG" >> $GITHUB_OUTPUT
           echo "webapp_name=$WEBAPP" >> $GITHUB_OUTPUT
           
-          echo "✓ Found: $WEBAPP in $RG"
+          echo "✓ Using: $WEBAPP in $RG"
+          echo "DEBUG - resource_group output: $RG"
+          echo "DEBUG - webapp_name output: $WEBAPP"
 
       - name: Configure App Service settings
         run: |
