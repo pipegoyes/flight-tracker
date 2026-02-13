@@ -104,4 +104,23 @@ public class PriceCheckRepository : Repository<PriceCheck>, IPriceCheckRepositor
             .Include(p => p.Destination)
             .FirstOrDefaultAsync(cancellationToken);
     }
+
+    public async Task<int> DeleteOrphanedPriceChecksAsync(
+        int targetDateId,
+        IEnumerable<int> validDestinationIds,
+        CancellationToken cancellationToken = default)
+    {
+        var validIds = validDestinationIds.ToHashSet();
+        
+        // Find price checks for destinations no longer associated
+        var orphanedPrices = await _dbSet
+            .Where(p => p.TargetDateId == targetDateId && !validIds.Contains(p.DestinationId))
+            .ToListAsync(cancellationToken);
+
+        if (!orphanedPrices.Any())
+            return 0;
+
+        _dbSet.RemoveRange(orphanedPrices);
+        return await _context.SaveChangesAsync(cancellationToken);
+    }
 }

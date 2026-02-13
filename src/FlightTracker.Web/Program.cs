@@ -55,6 +55,7 @@ builder.Services.AddScoped<IPriceCheckRepository, PriceCheckRepository>();
 builder.Services.AddScoped<FlightSearchService>();
 builder.Services.AddScoped<PriceHistoryService>();
 builder.Services.AddScoped<ConfigurationService>();
+builder.Services.AddScoped<TravelDateService>();
 builder.Services.AddSingleton<AirportCacheService>(); // Singleton for caching
 
 // Register background service for automated price checks
