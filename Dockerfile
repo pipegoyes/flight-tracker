@@ -45,10 +45,15 @@ RUN mkdir -p /app/data
 COPY --from=publish /app/publish .
 
 # Set environment variables
+ENV ASPNETCORE_ENVIRONMENT=Production
 ENV ASPNETCORE_URLS=http://+:8080
 ENV ConnectionStrings__FlightTracker="Data Source=/app/data/flighttracker.db"
 ENV APP_VERSION=${GIT_COMMIT}
 ENV APP_BUILD_TIME=${BUILD_TIME}
+
+# Note: Production secrets (Sentry DSN, API keys) are set via Azure App Service
+# environment variables, not baked into the image. This keeps secrets out of Git
+# and allows the same image to work in different environments.
 
 # Expose port
 EXPOSE 8080
