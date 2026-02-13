@@ -34,6 +34,8 @@ flighttracker.db*
 *.tfstate
 *.tfstate.*
 *.tfvars
+*.tfplan
+tfplan
 !terraform.tfvars.example
 .terraform/
 .terraform.lock.hcl
