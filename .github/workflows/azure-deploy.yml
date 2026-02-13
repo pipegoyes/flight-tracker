@@ -59,6 +59,10 @@ jobs:
           username: ${{ secrets.ACR_USERNAME }}
           password: ${{ secrets.ACR_PASSWORD }}
 
+      - name: Get build timestamp
+        id: timestamp
+        run: echo "time=$(date -u +'%Y-%m-%d %H:%M:%S UTC')" >> $GITHUB_OUTPUT
+
       - name: Build and push Docker image
         uses: docker/build-push-action@v5
         with:
@@ -67,6 +71,9 @@ jobs:
           push: true
           tags: ${{ env.ACR_SERVER }}/${{ env.DOCKER_IMAGE_NAME }}:latest
           platforms: linux/amd64
+          build-args: |
+            GIT_COMMIT=${{ github.sha }}
+            BUILD_TIME=${{ steps.timestamp.outputs.time }}
 
   deploy-to-azure:
     name: Deploy to Azure App Service

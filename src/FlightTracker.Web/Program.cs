@@ -57,6 +57,7 @@ builder.Services.AddScoped<PriceHistoryService>();
 builder.Services.AddScoped<ConfigurationService>();
 builder.Services.AddScoped<TravelDateService>();
 builder.Services.AddSingleton<AirportCacheService>(); // Singleton for caching
+builder.Services.AddSingleton<FlightTracker.Web.Services.VersionService>(); // Singleton for version info
 
 // Register background service for automated price checks
 builder.Services.AddHostedService<PriceCheckBackgroundService>();
@@ -129,15 +130,27 @@ app.UseAntiforgery();
 app.MapRazorComponents<App>()
     .AddInteractiveServerRenderMode();
 
-// Map health check endpoints
+// Version endpoint
+app.MapGet("/api/version", (FlightTracker.Web.Services.VersionService versionService) =>
+{
+    var version = versionService.GetVersion();
+    return Results.Ok(version);
+});
+
+// Map health check endpoints with version info
 app.MapHealthChecks("/health", new Microsoft.AspNetCore.Diagnostics.HealthChecks.HealthCheckOptions
 {
     ResponseWriter = async (context, report) =>
     {
+        var versionService = context.RequestServices.GetRequiredService<FlightTracker.Web.Services.VersionService>();
+        var version = versionService.GetVersion();
+        
         context.Response.ContentType = "application/json";
         var result = System.Text.Json.JsonSerializer.Serialize(new
         {
             status = report.Status.ToString(),
+            version = version.ShortCommit,
+            environment = version.Environment,
             checks = report.Entries.Select(e => new
             {
                 name = e.Key,
