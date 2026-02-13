@@ -23,20 +23,22 @@ public class AppConfig
 
 /// <summary>
 /// Configuration for data seeding behavior.
+/// Default values are false (safe for production).
+/// Enable explicitly in appsettings.json for development.
 /// </summary>
 public class SeedingConfig
 {
     /// <summary>
     /// Enable automatic seeding of demo travel dates (Rheinland-Pfalz holidays).
-    /// Should be disabled in production.
+    /// Default: false (safe for production).
     /// </summary>
-    public bool SeedDemoTravelDates { get; set; } = true;
+    public bool SeedDemoTravelDates { get; set; } = false;
 
     /// <summary>
     /// Enable automatic seeding of historical price data for demo.
-    /// Should be disabled in production.
+    /// Default: false (safe for production).
     /// </summary>
-    public bool SeedHistoricalPrices { get; set; } = true;
+    public bool SeedHistoricalPrices { get; set; } = false;
 }
 
 /// <summary>
