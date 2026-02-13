@@ -13,6 +13,7 @@ on:
 env:
   DOCKER_IMAGE_NAME: flight-tracker
   DOTNET_VERSION: '8.0.x'
+  ACR_SERVER: flighttrackeracr6ebcf3aa.azurecr.io
 
 jobs:
   build-and-test:
@@ -43,8 +44,6 @@ jobs:
     needs: build-and-test
     environment:
       name: Prod
-    env:
-      ACR_SERVER: flighttrackeracr6ebcf3aa.azurecr.io
     
     steps:
       - name: Checkout code
