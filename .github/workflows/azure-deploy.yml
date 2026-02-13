@@ -41,6 +41,8 @@ jobs:
     name: Build and Push Docker Image
     runs-on: ubuntu-latest
     needs: build-and-test
+    environment:
+      name: Prod
     
     steps:
       - name: Checkout code
