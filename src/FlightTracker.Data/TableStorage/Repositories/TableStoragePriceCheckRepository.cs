@@ -38,8 +38,13 @@ public class TableStoragePriceCheckRepository : IPriceCheckRepository
         var results = new List<PriceCheck>();
         await foreach (var entity in _tableClient.QueryAsync<PriceCheckEntity>(cancellationToken: cancellationToken))
         {
-            var destId = _destinationRepo.GetIdForCode(entity.DestinationCode);
-            results.Add(entity.ToDomain(destId));
+            var dest = await _destinationRepo.GetByCodeAsync(entity.DestinationCode, cancellationToken);
+            if (dest != null)
+            {
+                var priceCheck = entity.ToDomain(dest.Id);
+                priceCheck.Destination = dest;
+                results.Add(priceCheck);
+            }
         }
         return results;
     }
@@ -104,7 +109,11 @@ public class TableStoragePriceCheckRepository : IPriceCheckRepository
                 latest = entity;
         }
 
-        return latest?.ToDomain(destinationId);
+        if (latest == null) return null;
+        
+        var priceCheck = latest.ToDomain(destinationId);
+        priceCheck.Destination = dest;
+        return priceCheck;
     }
 
     public async Task<IEnumerable<PriceCheck>> GetLatestForTargetDateAsync(int targetDateId, CancellationToken cancellationToken = default)
@@ -124,8 +133,13 @@ public class TableStoragePriceCheckRepository : IPriceCheckRepository
         var results = new List<PriceCheck>();
         foreach (var kvp in byDestination)
         {
-            var destId = _destinationRepo.GetIdForCode(kvp.Key);
-            results.Add(kvp.Value.ToDomain(destId));
+            var dest = await _destinationRepo.GetByCodeAsync(kvp.Key, cancellationToken);
+            if (dest != null)
+            {
+                var priceCheck = kvp.Value.ToDomain(dest.Id);
+                priceCheck.Destination = dest;
+                results.Add(priceCheck);
+            }
         }
         return results;
     }
@@ -141,7 +155,11 @@ public class TableStoragePriceCheckRepository : IPriceCheckRepository
         await foreach (var entity in _tableClient.QueryAsync<PriceCheckEntity>(filter, cancellationToken: cancellationToken))
         {
             if (entity.CheckTimestamp >= since)
-                results.Add(entity.ToDomain(destinationId));
+            {
+                var priceCheck = entity.ToDomain(destinationId);
+                priceCheck.Destination = dest;
+                results.Add(priceCheck);
+            }
         }
 
         return results.OrderByDescending(p => p.CheckTimestamp);
@@ -154,8 +172,13 @@ public class TableStoragePriceCheckRepository : IPriceCheckRepository
         {
             if (entity.CheckTimestamp >= startDate && entity.CheckTimestamp <= endDate)
             {
-                var destId = _destinationRepo.GetIdForCode(entity.DestinationCode);
-                results.Add(entity.ToDomain(destId));
+                var dest = await _destinationRepo.GetByCodeAsync(entity.DestinationCode, cancellationToken);
+                if (dest != null)
+                {
+                    var priceCheck = entity.ToDomain(dest.Id);
+                    priceCheck.Destination = dest;
+                    results.Add(priceCheck);
+                }
             }
         }
         return results;
