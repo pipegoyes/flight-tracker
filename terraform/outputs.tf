@@ -52,6 +52,17 @@ output "app_service_identity_principal_id" {
   value       = azurerm_linux_web_app.flight_tracker.identity[0].principal_id
 }
 
+output "storage_account_name" {
+  description = "Name of the Storage Account for Table Storage"
+  value       = azurerm_storage_account.flight_tracker.name
+}
+
+output "storage_account_connection_string" {
+  description = "Connection string for Table Storage"
+  value       = azurerm_storage_account.flight_tracker.primary_connection_string
+  sensitive   = true
+}
+
 output "app_service_identity_tenant_id" {
   description = "Tenant ID of the App Service managed identity"
   value       = azurerm_linux_web_app.flight_tracker.identity[0].tenant_id

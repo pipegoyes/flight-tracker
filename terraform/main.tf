@@ -55,6 +55,38 @@ resource "azurerm_container_registry" "flight_tracker" {
   tags = var.tags
 }
 
+# Azure Storage Account for Table Storage (Production database)
+resource "azurerm_storage_account" "flight_tracker" {
+  name                     = "${var.app_name}data${random_id.suffix.hex}"
+  resource_group_name      = azurerm_resource_group.flight_tracker.name
+  location                 = azurerm_resource_group.flight_tracker.location
+  account_tier             = "Standard"
+  account_replication_type = "LRS"  # Locally redundant - cheapest option
+
+  tags = var.tags
+}
+
+# Table Storage tables
+resource "azurerm_storage_table" "destinations" {
+  name                 = "Destinations"
+  storage_account_name = azurerm_storage_account.flight_tracker.name
+}
+
+resource "azurerm_storage_table" "target_dates" {
+  name                 = "TargetDates"
+  storage_account_name = azurerm_storage_account.flight_tracker.name
+}
+
+resource "azurerm_storage_table" "price_checks" {
+  name                 = "PriceChecks"
+  storage_account_name = azurerm_storage_account.flight_tracker.name
+}
+
+resource "azurerm_storage_table" "target_date_destinations" {
+  name                 = "TargetDateDestinations"
+  storage_account_name = azurerm_storage_account.flight_tracker.name
+}
+
 # App Service Plan (B1 Basic for free tier eligibility)
 resource "azurerm_service_plan" "flight_tracker" {
   name                = "${var.app_name}-plan-${random_id.suffix.hex}"
@@ -121,6 +153,9 @@ resource "azurerm_linux_web_app" "flight_tracker" {
     FlightProvider__Type = var.flight_provider_type
     FlightProvider__ApiKey = var.flight_provider_api_key
     FlightProvider__ApiHost = var.flight_provider_api_host
+
+    # Azure Table Storage connection string (Production database)
+    TableStorage__ConnectionString = azurerm_storage_account.flight_tracker.primary_connection_string
 
     # ASP.NET Core environment
     ASPNETCORE_ENVIRONMENT = var.environment

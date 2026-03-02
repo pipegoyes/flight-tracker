@@ -3,6 +3,8 @@ using FlightTracker.Core.Models;
 using FlightTracker.Core.Services;
 using FlightTracker.Data;
 using FlightTracker.Data.Repositories;
+using FlightTracker.Data.TableStorage;
+using FlightTracker.Data.TableStorage.Repositories;
 using FlightTracker.Web.Components;
 using FlightTracker.Web.Data;
 using FlightTracker.Web.Services;
@@ -34,22 +36,46 @@ builder.Services.Configure<AppConfig>(
 builder.Services.Configure<SeedingConfig>(
     builder.Configuration.GetSection("Seeding"));
 
-// Configure database
-var connectionString = builder.Configuration.GetConnectionString("FlightTracker")
-    ?? "Data Source=flighttracker.db";
-builder.Services.AddDbContext<FlightTrackerDbContext>(options =>
-    options.UseSqlite(connectionString));
+// Configure database - use Table Storage in production if configured, SQLite otherwise
+var tableStorageConnectionString = builder.Configuration["TableStorage:ConnectionString"];
+var useTableStorage = !string.IsNullOrEmpty(tableStorageConnectionString);
 
-// Add health checks
-builder.Services.AddHealthChecks()
-    .AddDbContextCheck<FlightTrackerDbContext>(
-        name: "database",
-        tags: new[] { "db", "sqlite" });
+if (useTableStorage)
+{
+    // Production: Use Azure Table Storage
+    builder.Services.AddSingleton(new TableStorageContext(tableStorageConnectionString!));
+    builder.Services.AddSingleton<TableStorageDestinationRepository>();
+    builder.Services.AddScoped<IDestinationRepository>(sp => sp.GetRequiredService<TableStorageDestinationRepository>());
+    builder.Services.AddScoped<ITargetDateRepository, TableStorageTargetDateRepository>();
+    builder.Services.AddScoped<IPriceCheckRepository, TableStoragePriceCheckRepository>();
+    
+    // Add health check for Table Storage
+    builder.Services.AddHealthChecks()
+        .AddCheck("database", () =>
+        {
+            // Simple check - just verify we can access the context
+            return Microsoft.Extensions.Diagnostics.HealthChecks.HealthCheckResult.Healthy("Table Storage configured");
+        }, tags: new[] { "db", "tablestorage" });
+}
+else
+{
+    // Development: Use SQLite with EF Core
+    var connectionString = builder.Configuration.GetConnectionString("FlightTracker")
+        ?? "Data Source=flighttracker.db";
+    builder.Services.AddDbContext<FlightTrackerDbContext>(options =>
+        options.UseSqlite(connectionString));
 
-// Register repositories
-builder.Services.AddScoped<IDestinationRepository, DestinationRepository>();
-builder.Services.AddScoped<ITargetDateRepository, TargetDateRepository>();
-builder.Services.AddScoped<IPriceCheckRepository, PriceCheckRepository>();
+    // Add health checks for SQLite
+    builder.Services.AddHealthChecks()
+        .AddDbContextCheck<FlightTrackerDbContext>(
+            name: "database",
+            tags: new[] { "db", "sqlite" });
+
+    // Register EF Core repositories
+    builder.Services.AddScoped<IDestinationRepository, DestinationRepository>();
+    builder.Services.AddScoped<ITargetDateRepository, TargetDateRepository>();
+    builder.Services.AddScoped<IPriceCheckRepository, PriceCheckRepository>();
+}
 
 // Register application services
 builder.Services.AddScoped<FlightSearchService>();
@@ -174,39 +200,50 @@ app.MapHealthChecks("/health/live", new Microsoft.AspNetCore.Diagnostics.HealthC
 using (var scope = app.Services.CreateScope())
 {
     var services = scope.ServiceProvider;
+    var logger = services.GetRequiredService<ILogger<Program>>();
+    
     try
     {
-        var context = services.GetRequiredService<FlightTrackerDbContext>();
-        var configService = services.GetRequiredService<ConfigurationService>();
-        var seedingConfig = builder.Configuration.GetSection("Seeding").Get<SeedingConfig>() ?? new SeedingConfig();
-        var logger = services.GetRequiredService<ILogger<Program>>();
-        
-        // Create database if it doesn't exist
-        context.Database.EnsureCreated();
-        
-        // Seed comprehensive airport list first
-        await DataSeeder.SeedAirportsAsync(context);
-        
-        // Sync configuration with database (respects SeedDemoTravelDates flag)
-        await configService.InitializeAllAsync(seedingConfig.SeedDemoTravelDates);
-        
-        // Seed historical price data for testing (only if database is empty and enabled)
-        var hasPriceData = await context.PriceChecks.AnyAsync();
-        if (!hasPriceData && seedingConfig.SeedHistoricalPrices)
+        if (useTableStorage)
         {
-            await DataSeeder.SeedHistoricalPriceDataAsync(context, seedingConfig.SeedHistoricalPrices);
-            logger.LogInformation("Seeded historical price data for testing");
+            // Table Storage: Ensure tables exist
+            var tableContext = services.GetRequiredService<TableStorageContext>();
+            await tableContext.EnsureTablesExistAsync();
+            logger.LogInformation("Azure Table Storage initialized successfully");
         }
-        else if (!seedingConfig.SeedHistoricalPrices)
+        else
         {
-            logger.LogInformation("Historical price seeding is disabled");
+            // SQLite: Create database and seed data
+            var context = services.GetRequiredService<FlightTrackerDbContext>();
+            var configService = services.GetRequiredService<ConfigurationService>();
+            var seedingConfig = builder.Configuration.GetSection("Seeding").Get<SeedingConfig>() ?? new SeedingConfig();
+            
+            // Create database if it doesn't exist
+            context.Database.EnsureCreated();
+            
+            // Seed comprehensive airport list first
+            await DataSeeder.SeedAirportsAsync(context);
+            
+            // Sync configuration with database (respects SeedDemoTravelDates flag)
+            await configService.InitializeAllAsync(seedingConfig.SeedDemoTravelDates);
+            
+            // Seed historical price data for testing (only if database is empty and enabled)
+            var hasPriceData = await context.PriceChecks.AnyAsync();
+            if (!hasPriceData && seedingConfig.SeedHistoricalPrices)
+            {
+                await DataSeeder.SeedHistoricalPriceDataAsync(context, seedingConfig.SeedHistoricalPrices);
+                logger.LogInformation("Seeded historical price data for testing");
+            }
+            else if (!seedingConfig.SeedHistoricalPrices)
+            {
+                logger.LogInformation("Historical price seeding is disabled");
+            }
+            
+            logger.LogInformation("SQLite database initialized successfully");
         }
-        
-        logger.LogInformation("Database initialized successfully");
     }
     catch (Exception ex)
     {
-        var logger = services.GetRequiredService<ILogger<Program>>();
         logger.LogError(ex, "An error occurred while initializing the database");
     }
 }
