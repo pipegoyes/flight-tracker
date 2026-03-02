@@ -52,7 +52,7 @@ public class BookingComProvider : IFlightProvider
 
             // Build API URL
             // Note: Adjust endpoint based on actual Booking.com API documentation
-            var url = $"https://{_apiHost}/v1/flights/search?" +
+            var url = $"https://{_apiHost}/api/v1/flights/searchFlights?" +
                      $"fromId={originAirportCode}" +
                      $"&toId={destinationAirportCode}" +
                      $"&departDate={outboundDateStr}" +
