@@ -27,7 +27,8 @@ public class PriceCheckEntity : ITableEntity
 
     public static PriceCheckEntity FromDomain(Core.Entities.PriceCheck priceCheck, string destinationCode)
     {
-        var timestamp = priceCheck.CheckTimestamp.ToString("yyyyMMddHHmmss");
+        var checkTime = DateTime.SpecifyKind(priceCheck.CheckTimestamp, DateTimeKind.Utc);
+        var timestamp = checkTime.ToString("yyyyMMddHHmmss");
         return new PriceCheckEntity
         {
             PartitionKey = priceCheck.TargetDateId.ToString(),
@@ -41,7 +42,7 @@ public class PriceCheckEntity : ITableEntity
             DepartureTimeStr = priceCheck.DepartureTime.ToString("HH:mm"),
             ArrivalTimeStr = priceCheck.ArrivalTime.ToString("HH:mm"),
             BookingUrl = priceCheck.BookingUrl,
-            CheckTimestamp = priceCheck.CheckTimestamp
+            CheckTimestamp = checkTime
         };
     }
 

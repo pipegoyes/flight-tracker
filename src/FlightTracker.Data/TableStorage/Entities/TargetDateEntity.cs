@@ -27,12 +27,12 @@ public class TargetDateEntity : ITableEntity
         {
             RowKey = targetDate.Id.ToString(),
             Name = targetDate.Name,
-            OutboundDate = targetDate.OutboundDate,
-            ReturnDate = targetDate.ReturnDate,
+            OutboundDate = DateTime.SpecifyKind(targetDate.OutboundDate, DateTimeKind.Utc),
+            ReturnDate = DateTime.SpecifyKind(targetDate.ReturnDate, DateTimeKind.Utc),
             IsDeleted = targetDate.IsDeleted,
-            CreatedAt = targetDate.CreatedAt,
-            UpdatedAt = targetDate.UpdatedAt,
-            DeletedAt = targetDate.DeletedAt,
+            CreatedAt = DateTime.SpecifyKind(targetDate.CreatedAt, DateTimeKind.Utc),
+            UpdatedAt = targetDate.UpdatedAt.HasValue ? DateTime.SpecifyKind(targetDate.UpdatedAt.Value, DateTimeKind.Utc) : null,
+            DeletedAt = targetDate.DeletedAt.HasValue ? DateTime.SpecifyKind(targetDate.DeletedAt.Value, DateTimeKind.Utc) : null,
             DestinationCodes = destinationCodes != null ? string.Join(",", destinationCodes) : string.Empty
         };
     }
