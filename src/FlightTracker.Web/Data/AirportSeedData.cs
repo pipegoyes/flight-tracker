@@ -165,6 +165,15 @@ public static class AirportSeedData
             new Destination { AirportCode = "BKK", Name = "Bangkok" },
             new Destination { AirportCode = "SIN", Name = "Singapore" },
             new Destination { AirportCode = "HKG", Name = "Hong Kong" },
+            
+            // South America
+            new Destination { AirportCode = "BOG", Name = "Bogotá" },
+            new Destination { AirportCode = "GRU", Name = "São Paulo" },
+            new Destination { AirportCode = "EZE", Name = "Buenos Aires" },
+            new Destination { AirportCode = "SCL", Name = "Santiago de Chile" },
+            new Destination { AirportCode = "LIM", Name = "Lima" },
+            new Destination { AirportCode = "CTG", Name = "Cartagena" },
+            new Destination { AirportCode = "MDE", Name = "Medellín" },
         };
     }
 }

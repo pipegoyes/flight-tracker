@@ -209,6 +209,11 @@ using (var scope = app.Services.CreateScope())
             // Table Storage: Ensure tables exist
             var tableContext = services.GetRequiredService<TableStorageContext>();
             await tableContext.EnsureTablesExistAsync();
+            
+            // Seed airports into Table Storage
+            var destinationRepo = services.GetRequiredService<IDestinationRepository>();
+            await TableStorageSeeder.SeedAirportsAsync(destinationRepo, logger);
+            
             logger.LogInformation("Azure Table Storage initialized successfully");
         }
         else
