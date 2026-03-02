@@ -1,4 +1,3 @@
-using System.Net.Http.Headers;
 using System.Text.Json;
 using FlightTracker.Core.Interfaces;
 using FlightTracker.Core.Models;
@@ -7,7 +6,7 @@ using Microsoft.Extensions.Logging;
 namespace FlightTracker.Providers.BookingCom;
 
 /// <summary>
-/// Booking.com API provider via RapidAPI.
+/// Booking.com API provider via RapidAPI using getMinPrice endpoint.
 /// </summary>
 public class BookingComProvider : IFlightProvider
 {
@@ -27,7 +26,8 @@ public class BookingComProvider : IFlightProvider
         _apiHost = apiHost;
         _logger = logger;
 
-        // Configure HttpClient
+        // Configure HttpClient headers
+        _httpClient.DefaultRequestHeaders.Clear();
         _httpClient.DefaultRequestHeaders.Add("X-RapidAPI-Key", _apiKey);
         _httpClient.DefaultRequestHeaders.Add("X-RapidAPI-Host", _apiHost);
     }
@@ -50,16 +50,18 @@ public class BookingComProvider : IFlightProvider
             var outboundDateStr = outboundDate.ToString("yyyy-MM-dd");
             var returnDateStr = returnDate.ToString("yyyy-MM-dd");
 
-            // Build API URL
-            // Note: Adjust endpoint based on actual Booking.com API documentation
-            var url = $"https://{_apiHost}/api/v1/flights/searchFlights?" +
-                     $"fromId={originAirportCode}" +
-                     $"&toId={destinationAirportCode}" +
+            // Build API URL - using getMinPrice endpoint
+            // Airport codes need .AIRPORT suffix
+            var url = $"https://{_apiHost}/api/v1/flights/getMinPrice?" +
+                     $"fromId={originAirportCode}.AIRPORT" +
+                     $"&toId={destinationAirportCode}.AIRPORT" +
                      $"&departDate={outboundDateStr}" +
                      $"&returnDate={returnDateStr}" +
                      $"&adults=1" +
                      $"&cabinClass=ECONOMY" +
-                     $"&currency=EUR";
+                     $"&currency_code=EUR";
+
+            _logger.LogDebug("Calling Booking.com API: {Url}", url);
 
             var response = await _httpClient.GetAsync(url, cancellationToken);
 
@@ -83,11 +85,13 @@ public class BookingComProvider : IFlightProvider
             }
 
             var content = await response.Content.ReadAsStringAsync(cancellationToken);
-            var searchResponse = JsonSerializer.Deserialize<BookingComSearchResponse>(
+            _logger.LogDebug("Booking.com API response: {Content}", content);
+
+            var apiResponse = JsonSerializer.Deserialize<BookingComMinPriceResponse>(
                 content,
                 new JsonSerializerOptions { PropertyNameCaseInsensitive = true });
 
-            if (searchResponse?.Data?.Flights == null || !searchResponse.Data.Flights.Any())
+            if (apiResponse?.Status != true || apiResponse.Data == null || !apiResponse.Data.Any())
             {
                 _logger.LogWarning("No flights found in Booking.com API response");
                 return new FlightSearchResult
@@ -101,21 +105,39 @@ public class BookingComProvider : IFlightProvider
                 };
             }
 
-            // Parse flights
-            var flights = searchResponse.Data.Flights
-                .Select(f => ParseFlight(f))
-                .Where(f => f != null)
-                .OrderBy(f => f!.Price)
-                .ToList();
+            // Find the price for the exact requested dates (offsetDays = 0)
+            // or get the cheapest one
+            var exactMatch = apiResponse.Data.FirstOrDefault(d => d.OffsetDays == 0);
+            var cheapest = apiResponse.Data.FirstOrDefault(d => d.IsCheapest == true);
+            var priceData = exactMatch ?? cheapest ?? apiResponse.Data.First();
+
+            // Calculate price from units and nanos
+            var price = priceData.Price?.Units ?? 0m;
+            if (priceData.Price?.Nanos > 0)
+            {
+                price += priceData.Price.Nanos / 1_000_000_000m;
+            }
+
+            var flight = new FlightOption
+            {
+                Price = price,
+                Currency = priceData.Price?.CurrencyCode ?? "EUR",
+                DepartureTime = DateTime.Parse(priceData.DepartureDate ?? outboundDate.ToString("yyyy-MM-dd")),
+                ArrivalTime = DateTime.Parse(priceData.ReturnDate ?? returnDate.ToString("yyyy-MM-dd")),
+                Airline = "Various", // getMinPrice doesn't return airline info
+                Stops = -1, // Unknown from this endpoint
+                BookingUrl = $"https://www.booking.com/flights/search.html?from={originAirportCode}&to={destinationAirportCode}&depart={outboundDateStr}&return={returnDateStr}"
+            };
 
             _logger.LogInformation(
-                "Found {Count} flights via Booking.com API",
-                flights.Count);
+                "Found flight price via Booking.com API: {Price} {Currency}",
+                flight.Price,
+                flight.Currency);
 
             return new FlightSearchResult
             {
                 Success = true,
-                Flights = flights!,
+                Flights = new[] { flight },
                 Origin = originAirportCode,
                 Destination = destinationAirportCode,
                 OutboundDate = outboundDate,
@@ -146,64 +168,29 @@ public class BookingComProvider : IFlightProvider
         }
     }
 
-    private FlightOption? ParseFlight(BookingComFlight flight)
-    {
-        try
-        {
-            // Extract outbound leg details
-            var outboundLeg = flight.Legs?.FirstOrDefault();
-            if (outboundLeg == null)
-                return null;
+    #region Response Models for getMinPrice
 
-            return new FlightOption
-            {
-                Price = flight.Price?.Total ?? 0m,
-                Currency = flight.Price?.Currency ?? "EUR",
-                DepartureTime = DateTime.Parse(outboundLeg.DepartureTime ?? DateTime.Now.ToString()),
-                ArrivalTime = DateTime.Parse(outboundLeg.ArrivalTime ?? DateTime.Now.ToString()),
-                Airline = outboundLeg.Carriers?.FirstOrDefault() ?? "Unknown",
-                Stops = (outboundLeg.Stops ?? 0),
-                BookingUrl = flight.DeepLink ?? $"https://www.booking.com/flights/"
-            };
-        }
-        catch (Exception ex)
-        {
-            _logger.LogWarning(ex, "Failed to parse flight from Booking.com response");
-            return null;
-        }
+    private class BookingComMinPriceResponse
+    {
+        public bool Status { get; set; }
+        public string? Message { get; set; }
+        public List<MinPriceData>? Data { get; set; }
     }
 
-    #region Response Models
-
-    private class BookingComSearchResponse
+    private class MinPriceData
     {
-        public BookingComData? Data { get; set; }
+        public string? DepartureDate { get; set; }
+        public string? ReturnDate { get; set; }
+        public int OffsetDays { get; set; }
+        public bool IsCheapest { get; set; }
+        public MinPriceValue? Price { get; set; }
     }
 
-    private class BookingComData
+    private class MinPriceValue
     {
-        public List<BookingComFlight>? Flights { get; set; }
-    }
-
-    private class BookingComFlight
-    {
-        public BookingComPrice? Price { get; set; }
-        public List<BookingComLeg>? Legs { get; set; }
-        public string? DeepLink { get; set; }
-    }
-
-    private class BookingComPrice
-    {
-        public decimal Total { get; set; }
-        public string? Currency { get; set; }
-    }
-
-    private class BookingComLeg
-    {
-        public string? DepartureTime { get; set; }
-        public string? ArrivalTime { get; set; }
-        public List<string>? Carriers { get; set; }
-        public int? Stops { get; set; }
+        public string? CurrencyCode { get; set; }
+        public decimal Units { get; set; }
+        public long Nanos { get; set; }
     }
 
     #endregion
