@@ -67,12 +67,34 @@ variable "flight_tracker_origin" {
   default     = "FRA"
 }
 
-# NOTE: Secrets are NOT managed by Terraform
-# These are set via GitHub Actions from GitHub Secrets:
-# - Sentry__Dsn
-# - FlightProvider__Type  
-# - FlightProvider__ApiKey
-# - FlightProvider__ApiHost
+variable "sentry_dsn" {
+  description = "Sentry DSN for error tracking"
+  type        = string
+  sensitive   = true
+}
+
+variable "flight_provider_type" {
+  description = "Flight provider type (Mock, BookingCom, Skyscanner)"
+  type        = string
+  default     = "BookingCom"
+  
+  validation {
+    condition     = contains(["Mock", "BookingCom", "Skyscanner"], var.flight_provider_type)
+    error_message = "Flight provider must be Mock, BookingCom, or Skyscanner"
+  }
+}
+
+variable "flight_provider_api_key" {
+  description = "Flight provider API key (RapidAPI)"
+  type        = string
+  sensitive   = true
+}
+
+variable "flight_provider_api_host" {
+  description = "Flight provider API host"
+  type        = string
+  default     = "booking-com15.p.rapidapi.com"
+}
 
 variable "custom_domain" {
   description = "Custom domain for the app (optional)"

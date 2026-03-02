@@ -132,37 +132,41 @@ resource "azurerm_linux_web_app" "flight_tracker" {
   }
 
   # Application settings (environment variables)
-  # NOTE: Secrets (Sentry DSN, API keys) are managed via GitHub Actions, not Terraform
-  # This prevents secrets from being stored in Terraform state files
   app_settings = {
-    # Docker registry credentials (from Terraform-managed ACR)
+    # Docker registry credentials
     DOCKER_REGISTRY_SERVER_URL      = "https://${azurerm_container_registry.flight_tracker.login_server}"
     DOCKER_REGISTRY_SERVER_USERNAME = azurerm_container_registry.flight_tracker.admin_username
     DOCKER_REGISTRY_SERVER_PASSWORD = azurerm_container_registry.flight_tracker.admin_password
     DOCKER_ENABLE_CI                = "true"
 
-    # Application Insights (from Terraform-managed resource)
+    # Application Insights
     APPLICATIONINSIGHTS_CONNECTION_STRING = azurerm_application_insights.flight_tracker.connection_string
     ApplicationInsightsAgent_EXTENSION_VERSION = "~3"
 
-    # Azure Table Storage connection string (from Terraform-managed storage account)
+    # Azure Table Storage connection string
     TableStorage__ConnectionString = azurerm_storage_account.flight_tracker.primary_connection_string
 
-    # Non-secret configuration
+    # Sentry error tracking
+    Sentry__Dsn = var.sentry_dsn
+
+    # Flight Tracker configuration
     FlightTracker__Origin = var.flight_tracker_origin
+
+    # Flight Provider configuration
+    FlightProvider__Type    = var.flight_provider_type
+    FlightProvider__ApiKey  = var.flight_provider_api_key
+    FlightProvider__ApiHost = var.flight_provider_api_host
+
+    # ASP.NET Core environment
     ASPNETCORE_ENVIRONMENT = var.environment
+
+    # Port configuration
     PORT = "8080"
     WEBSITES_PORT = "8080"
 
     # SignalR / Blazor Server
     WEBSITE_LOCAL_CACHE_OPTION = "Always"
     WEBSITE_DISABLE_ARR_AFFINITY = "false"
-
-    # Secrets set by GitHub Actions (not Terraform):
-    # - Sentry__Dsn
-    # - FlightProvider__Type
-    # - FlightProvider__ApiKey
-    # - FlightProvider__ApiHost
   }
 
   # Connection strings (if needed for future use)
