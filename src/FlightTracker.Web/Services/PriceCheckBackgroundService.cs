@@ -6,7 +6,7 @@ public class PriceCheckBackgroundService : BackgroundService
 {
     private readonly IServiceScopeFactory _scopeFactory;
     private readonly ILogger<PriceCheckBackgroundService> _logger;
-    private readonly TimeSpan _checkInterval = TimeSpan.FromHours(12); // 8 AM and 8 PM = 12 hour interval
+    private readonly TimeSpan _checkInterval = TimeSpan.FromHours(24); // Once per day
 
     public PriceCheckBackgroundService(
         IServiceScopeFactory scopeFactory,
@@ -20,7 +20,7 @@ public class PriceCheckBackgroundService : BackgroundService
     {
         _logger.LogInformation("Price Check Background Service started");
 
-        // Wait until next scheduled time (8 AM or 8 PM CET)
+        // Wait until next scheduled time (8 AM CET daily)
         await WaitUntilNextScheduledTime(stoppingToken);
 
         while (!stoppingToken.IsCancellationRequested)
@@ -36,7 +36,7 @@ public class PriceCheckBackgroundService : BackgroundService
                 _logger.LogError(ex, "Error occurred during scheduled price check");
             }
 
-            // Wait 12 hours until next check
+            // Wait 24 hours until next check
             try
             {
                 await Task.Delay(_checkInterval, stoppingToken);
@@ -74,8 +74,8 @@ public class PriceCheckBackgroundService : BackgroundService
         var berlinTimeZone = TimeZoneInfo.FindSystemTimeZoneById("Europe/Berlin");
         var nowBerlin = TimeZoneInfo.ConvertTimeFromUtc(DateTime.UtcNow, berlinTimeZone);
 
-        // Scheduled times: 8 AM and 8 PM
-        var scheduledHours = new[] { 8, 20 };
+        // Scheduled time: 8 AM CET daily
+        var scheduledHours = new[] { 8 };
 
         // Find next scheduled time
         TimeSpan delay;
