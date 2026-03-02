@@ -61,41 +61,18 @@ variable "environment" {
   }
 }
 
-variable "sentry_dsn" {
-  description = "Sentry DSN for error tracking"
-  type        = string
-  sensitive   = true
-}
-
 variable "flight_tracker_origin" {
   description = "Origin airport code (e.g., FRA for Frankfurt)"
   type        = string
   default     = "FRA"
 }
 
-variable "flight_provider_type" {
-  description = "Flight provider type (Mock, BookingCom, Skyscanner)"
-  type        = string
-  default     = "Mock"
-  
-  validation {
-    condition     = contains(["Mock", "BookingCom", "Skyscanner"], var.flight_provider_type)
-    error_message = "Flight provider must be Mock, BookingCom, or Skyscanner"
-  }
-}
-
-variable "flight_provider_api_key" {
-  description = "Flight provider API key (if using real provider)"
-  type        = string
-  default     = ""
-  sensitive   = true
-}
-
-variable "flight_provider_api_host" {
-  description = "Flight provider API host (e.g., booking-com.p.rapidapi.com)"
-  type        = string
-  default     = ""
-}
+# NOTE: Secrets are NOT managed by Terraform
+# These are set via GitHub Actions from GitHub Secrets:
+# - Sentry__Dsn
+# - FlightProvider__Type  
+# - FlightProvider__ApiKey
+# - FlightProvider__ApiHost
 
 variable "custom_domain" {
   description = "Custom domain for the app (optional)"
