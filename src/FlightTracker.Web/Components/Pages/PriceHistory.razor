@@ -20,6 +20,12 @@
             </div>
         </div>
     }
+    else if (errorMessage != null)
+    {
+        <div class="alert alert-danger">
+            <strong>Error:</strong> @errorMessage
+        </div>
+    }
     else if (priceHistory.Any())
     {
         var latest = priceHistory.Last();
@@ -29,8 +35,8 @@
         var priceChange = latest.Price - oldest.Price;
         var percentChange = (priceChange / oldest.Price) * 100;
 
-        <h2>@latest.Destination.Name</h2>
-        <h5 class="text-muted">@latest.TargetDate.Name</h5>
+        <h2>@(latest.Destination?.Name ?? "Unknown Destination")</h2>
+        <h5 class="text-muted">@(latest.TargetDate?.Name ?? "Unknown Date")</h5>
 
         <!-- Stats Cards -->
         <div class="row mt-4 mb-4">
@@ -139,17 +145,32 @@
 
     private List<PriceCheck> priceHistory = new();
     private bool isLoading = true;
+    private string? errorMessage;
 
     protected override async Task OnInitializedAsync()
     {
         try
         {
-            priceHistory = (await PriceHistoryService.GetPriceHistoryAsync(
+            var history = await PriceHistoryService.GetPriceHistoryAsync(
                 TargetDateId,
                 DestinationId,
-                daysBack: 30))
+                daysBack: 30);
+            
+            priceHistory = history
                 .OrderBy(p => p.CheckTimestamp)
                 .ToList();
+
+            // Validate that navigation properties are loaded
+            if (priceHistory.Any() && 
+                (priceHistory.First().Destination == null || priceHistory.First().TargetDate == null))
+            {
+                errorMessage = "Failed to load route details. Please try again.";
+                priceHistory.Clear();
+            }
+        }
+        catch (Exception ex)
+        {
+            errorMessage = $"Failed to load price history: {ex.Message}";
         }
         finally
         {
@@ -167,56 +188,66 @@
 
     private async Task RenderChartAsync()
     {
-        var labels = priceHistory.Select(p => p.CheckTimestamp.ToString("MMM dd HH:mm")).ToArray();
-        var prices = priceHistory.Select(p => (double)p.Price).ToArray();
+        try
+        {
+            var labels = priceHistory.Select(p => p.CheckTimestamp.ToString("MMM dd HH:mm")).ToArray();
+            var prices = priceHistory.Select(p => (double)p.Price).ToArray();
 
-        var labelsJson = System.Text.Json.JsonSerializer.Serialize(labels);
-        var pricesJson = System.Text.Json.JsonSerializer.Serialize(prices);
+            var labelsJson = System.Text.Json.JsonSerializer.Serialize(labels);
+            var pricesJson = System.Text.Json.JsonSerializer.Serialize(prices);
 
-        var script = $@"
-            const ctx = document.getElementById('priceChart');
-            if (ctx && window.Chart) {{
-                new Chart(ctx, {{
-                    type: 'line',
-                    data: {{
-                        labels: {labelsJson},
-                        datasets: [{{
-                            label: 'Price (EUR)',
-                            data: {pricesJson},
-                            borderColor: '#0d6efd',
-                            backgroundColor: 'rgba(13, 110, 253, 0.1)',
-                            tension: 0.1,
-                            fill: true
-                        }}]
-                    }},
-                    options: {{
-                        responsive: true,
-                        maintainAspectRatio: true,
-                        plugins: {{
-                            legend: {{
-                                display: false
-                            }},
-                            tooltip: {{
-                                mode: 'index',
-                                intersect: false
-                            }}
+            var script = $@"
+                const ctx = document.getElementById('priceChart');
+                if (ctx && window.Chart) {{
+                    new Chart(ctx, {{
+                        type: 'line',
+                        data: {{
+                            labels: {labelsJson},
+                            datasets: [{{
+                                label: 'Price (EUR)',
+                                data: {pricesJson},
+                                borderColor: '#0d6efd',
+                                backgroundColor: 'rgba(13, 110, 253, 0.1)',
+                                tension: 0.1,
+                                fill: true
+                            }}]
                         }},
-                        scales: {{
-                            y: {{
-                                beginAtZero: false,
-                                ticks: {{
-                                    callback: function(value) {{
-                                        return '€' + value;
+                        options: {{
+                            responsive: true,
+                            maintainAspectRatio: true,
+                            plugins: {{
+                                legend: {{
+                                    display: false
+                                }},
+                                tooltip: {{
+                                    mode: 'index',
+                                    intersect: false
+                                }}
+                            }},
+                            scales: {{
+                                y: {{
+                                    beginAtZero: false,
+                                    ticks: {{
+                                        callback: function(value) {{
+                                            return '€' + value;
+                                        }}
                                     }}
                                 }}
                             }}
                         }}
-                    }}
-                }});
-            }}
-        ";
+                    }});
+                }} else {{
+                    console.warn('Chart.js not loaded or canvas element not found');
+                }}
+            ";
 
-        await JS.InvokeVoidAsync("eval", script);
+            await JS.InvokeVoidAsync("eval", script);
+        }
+        catch (Exception ex)
+        {
+            // Log but don't fail - chart is nice-to-have
+            Console.WriteLine($"Failed to render chart: {ex.Message}");
+        }
     }
 
     private void NavigateBack()
