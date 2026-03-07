@@ -153,9 +153,11 @@ resource "azurerm_linux_web_app" "flight_tracker" {
     FlightTracker__Origin = var.flight_tracker_origin
 
     # Flight Provider configuration
-    FlightProvider__Type    = var.flight_provider_type
-    FlightProvider__ApiKey  = var.flight_provider_api_key
-    FlightProvider__ApiHost = var.flight_provider_api_host
+    FlightProvider__Type          = var.flight_provider_type
+    FlightProvider__ApiKey        = var.flight_provider_api_key
+    FlightProvider__ApiSecret     = var.flight_provider_api_secret
+    FlightProvider__ApiHost       = var.flight_provider_api_host
+    FlightProvider__UseProduction = tostring(var.flight_provider_use_production)
 
     # ASP.NET Core environment
     ASPNETCORE_ENVIRONMENT = var.environment

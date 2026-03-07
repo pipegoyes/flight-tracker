@@ -110,9 +110,11 @@ jobs:
             --resource-group ${{ steps.discover.outputs.resource_group }} \
             --settings \
               "Sentry__Dsn=${{ secrets.SENTRY_DSN }}" \
+              "FlightProvider__Type=${{ secrets.FLIGHT_PROVIDER_TYPE }}" \
               "FlightProvider__ApiKey=${{ secrets.FLIGHT_PROVIDER_API_KEY }}" \
+              "FlightProvider__ApiSecret=${{ secrets.FLIGHT_PROVIDER_API_SECRET }}" \
               "FlightProvider__ApiHost=${{ secrets.FLIGHT_PROVIDER_API_HOST }}" \
-              "FlightProvider__Type=${{ secrets.FLIGHT_PROVIDER_TYPE }}"
+              "FlightProvider__UseProduction=${{ secrets.FLIGHT_PROVIDER_USE_PRODUCTION }}"
 
       - name: Deploy to Azure Web App
         id: deploy
