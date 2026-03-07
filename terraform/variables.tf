@@ -74,26 +74,39 @@ variable "sentry_dsn" {
 }
 
 variable "flight_provider_type" {
-  description = "Flight provider type (Mock, BookingCom, Skyscanner)"
+  description = "Flight provider type (Mock, BookingCom, Amadeus)"
   type        = string
-  default     = "BookingCom"
+  default     = "Amadeus"
   
   validation {
-    condition     = contains(["Mock", "BookingCom", "Skyscanner"], var.flight_provider_type)
-    error_message = "Flight provider must be Mock, BookingCom, or Skyscanner"
+    condition     = contains(["Mock", "BookingCom", "Amadeus"], var.flight_provider_type)
+    error_message = "Flight provider must be Mock, BookingCom, or Amadeus"
   }
 }
 
 variable "flight_provider_api_key" {
-  description = "Flight provider API key (RapidAPI)"
+  description = "Flight provider API key (RapidAPI key for BookingCom, Client ID for Amadeus)"
   type        = string
   sensitive   = true
 }
 
-variable "flight_provider_api_host" {
-  description = "Flight provider API host"
+variable "flight_provider_api_secret" {
+  description = "Flight provider API secret (Client Secret for Amadeus, not used for BookingCom)"
   type        = string
-  default     = "booking-com15.p.rapidapi.com"
+  default     = ""
+  sensitive   = true
+}
+
+variable "flight_provider_api_host" {
+  description = "Flight provider API host (only for BookingCom/RapidAPI)"
+  type        = string
+  default     = ""
+}
+
+variable "flight_provider_use_production" {
+  description = "Use production environment for Amadeus (default: false = test environment with free quota)"
+  type        = bool
+  default     = false
 }
 
 variable "custom_domain" {

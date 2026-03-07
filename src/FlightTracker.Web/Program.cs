@@ -130,6 +130,33 @@ switch (providerType.ToLowerInvariant())
         });
         break;
 
+    case "amadeus":
+        if (string.IsNullOrEmpty(providerConfig?.ApiKey))
+        {
+            throw new InvalidOperationException(
+                "Amadeus provider requires ApiKey (Client ID) in FlightProvider configuration");
+        }
+        if (string.IsNullOrEmpty(providerConfig?.ApiSecret))
+        {
+            throw new InvalidOperationException(
+                "Amadeus provider requires ApiSecret (Client Secret) in FlightProvider configuration");
+        }
+
+        builder.Services.AddScoped<IFlightProvider>(sp =>
+        {
+            var httpClientFactory = sp.GetRequiredService<IHttpClientFactory>();
+            var httpClient = httpClientFactory.CreateClient();
+            var logger = sp.GetRequiredService<ILogger<FlightTracker.Providers.Amadeus.AmadeusProvider>>();
+            
+            return new FlightTracker.Providers.Amadeus.AmadeusProvider(
+                httpClient,
+                providerConfig.ApiKey,
+                providerConfig.ApiSecret,
+                providerConfig.UseProduction,
+                logger);
+        });
+        break;
+
     case "skyscanner":
         // Future: Implement Skyscanner provider
         throw new NotImplementedException("Skyscanner provider not yet implemented");

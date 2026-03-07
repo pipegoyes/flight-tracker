@@ -26,6 +26,12 @@ public class FlightProviderConfig
     public string? ApiHost { get; set; }
 
     /// <summary>
+    /// Use production environment (for Amadeus API).
+    /// Default: false (uses test/sandbox environment with free quota).
+    /// </summary>
+    public bool UseProduction { get; set; } = false;
+
+    /// <summary>
     /// Additional provider-specific settings
     /// </summary>
     public Dictionary<string, string> Settings { get; set; } = new();
