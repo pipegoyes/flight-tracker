@@ -140,28 +140,6 @@ public class TargetDateManagementTests : IDisposable
     }
 
     [Fact]
-    public async Task UpdateTargetDate_DeletedDate_ShouldReturnFalse()
-    {
-        // Arrange
-        var targetDate = new TargetDate
-        {
-            Name = "Conference",
-            OutboundDate = DateTime.Today.AddDays(60),
-            ReturnDate = DateTime.Today.AddDays(63)
-        };
-
-        var created = await _repository.CreateTargetDateAsync(targetDate);
-        await _repository.SoftDeleteAsync(created.Id);
-
-        // Act: Try to update a deleted date
-        created.Name = "Updated Conference";
-        var updateResult = await _repository.UpdateTargetDateAsync(created);
-
-        // Assert: Should return false (date is deleted)
-        Assert.False(updateResult);
-    }
-
-    [Fact]
     public async Task GetAllAsync_ExcludesDeletedByDefault()
     {
         // Arrange

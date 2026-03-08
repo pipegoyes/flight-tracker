@@ -30,7 +30,7 @@
 {
     <div class="card mb-4 border-primary">
         <div class="card-header bg-primary text-white">
-            <h5 class="mb-0">@(editingDate == null ? "Add" : "Edit") Travel Date</h5>
+            <h5 class="mb-0">Add Travel Date</h5>
         </div>
         <div class="card-body">
             <div class="mb-3">
@@ -239,11 +239,7 @@
                                         </div>
                                     }
                                 </div>
-                                <div class="d-flex gap-2">
-                                    <button class="btn btn-sm btn-outline-primary" 
-                                            @onclick="() => EditDate(date)">
-                                        <i class="bi bi-pencil"></i> Edit
-                                    </button>
+                                <div>
                                     <button class="btn btn-sm btn-outline-danger" 
                                             @onclick="() => DeleteDate(date.Id)">
                                         <i class="bi bi-trash"></i> Delete
@@ -346,7 +342,6 @@
     private bool showAddForm = false;
     private bool showDeleted = false;
     private bool isSaving = false;
-    private TargetDate? editingDate = null;
     private string validationMessage = string.Empty;
     private string outboundDateError = string.Empty;
     private string returnDateError = string.Empty;
@@ -388,7 +383,6 @@
 
     private void ShowAddForm()
     {
-        editingDate = null;
         newDate = new TargetDateModel
         {
             OutboundDate = DateTime.Today.AddMonths(1),
@@ -404,33 +398,9 @@
         showAddForm = true;
     }
 
-    private async Task EditDate(TargetDate date)
-    {
-        editingDate = date;
-        newDate = new TargetDateModel
-        {
-            Name = date.Name,
-            OutboundDate = date.OutboundDate,
-            ReturnDate = date.ReturnDate
-        };
-        
-        // Load current destinations
-        var destinations = await TargetDateRepository.GetDestinationsAsync(date.Id);
-        selectedDestinations = destinations.ToList();
-        
-        searchQuery = "";
-        filteredAirports.Clear();
-        showDropdown = false;
-        validationMessage = string.Empty;
-        outboundDateError = string.Empty;
-        returnDateError = string.Empty;
-        showAddForm = true;
-    }
-
     private void CancelEdit()
     {
         showAddForm = false;
-        editingDate = null;
         selectedDestinations.Clear();
         searchQuery = "";
         filteredAirports.Clear();
@@ -450,27 +420,12 @@
         {
             var destinationIds = selectedDestinations.Select(d => d.Id).ToList();
 
-            TravelDateResult result;
-            
-            if (editingDate == null)
-            {
-                // Create new via service
-                result = await TravelDateService.CreateAsync(
-                    newDate.Name,
-                    newDate.OutboundDate,
-                    newDate.ReturnDate,
-                    destinationIds);
-            }
-            else
-            {
-                // Update existing via service (handles price invalidation for removed destinations)
-                result = await TravelDateService.UpdateAsync(
-                    editingDate.Id,
-                    newDate.Name,
-                    newDate.OutboundDate,
-                    newDate.ReturnDate,
-                    destinationIds);
-            }
+            // Create new travel date
+            var result = await TravelDateService.CreateAsync(
+                newDate.Name,
+                newDate.OutboundDate,
+                newDate.ReturnDate,
+                destinationIds);
 
             if (!result.IsSuccess)
             {
@@ -479,7 +434,6 @@
             }
 
             showAddForm = false;
-            editingDate = null;
             selectedDestinations.Clear();
             await LoadDates();
         }

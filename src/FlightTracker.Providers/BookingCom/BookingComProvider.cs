@@ -126,7 +126,7 @@ public class BookingComProvider : IFlightProvider
                 ArrivalTime = DateTime.Parse(priceData.ReturnDate ?? returnDate.ToString("yyyy-MM-dd")),
                 Airline = "Various", // getMinPrice doesn't return airline info
                 Stops = -1, // Unknown from this endpoint
-                BookingUrl = $"https://www.booking.com/flights/search.html?from={originAirportCode}&to={destinationAirportCode}&depart={outboundDateStr}&return={returnDateStr}"
+                BookingUrl = $"https://www.skyscanner.com/transport/flights/{originAirportCode.ToLower()}/{destinationAirportCode.ToLower()}/{outboundDate.ToString("yyMMdd")}/{returnDate.ToString("yyMMdd")}/"
             };
 
             _logger.LogInformation(

@@ -144,10 +144,10 @@ public class MockFlightProvider : IFlightProvider
         DateTime outbound,
         DateTime returnDate)
     {
-        // Generate a fake booking URL
-        var outboundStr = outbound.ToString("yyyy-MM-dd");
-        var returnStr = returnDate.ToString("yyyy-MM-dd");
+        // Skyscanner URL format: https://www.skyscanner.com/transport/flights/{origin}/{destination}/{outbound-yymmdd}/{return-yymmdd}/
+        var outboundStr = outbound.ToString("yyMMdd");
+        var returnStr = returnDate.ToString("yyMMdd");
         
-        return $"https://www.skyscanner.com/transport/flights/{origin}/{destination}/{outboundStr}/{returnStr}/";
+        return $"https://www.skyscanner.com/transport/flights/{origin.ToLower()}/{destination.ToLower()}/{outboundStr}/{returnStr}/";
     }
 }
