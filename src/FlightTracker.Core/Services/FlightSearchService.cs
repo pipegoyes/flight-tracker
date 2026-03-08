@@ -130,7 +130,10 @@ public class FlightSearchService
                 ArrivalTime = TimeOnly.FromDateTime(cheapestFlight.ArrivalTime),
                 Airline = cheapestFlight.Airline,
                 Stops = cheapestFlight.Stops,
-                BookingUrl = cheapestFlight.BookingUrl
+                BookingUrl = cheapestFlight.BookingUrl,
+                // Populate navigation properties to avoid null reference errors
+                Destination = destination,
+                TargetDate = targetDate
             };
 
             await _priceCheckRepository.AddAsync(priceCheck, cancellationToken);

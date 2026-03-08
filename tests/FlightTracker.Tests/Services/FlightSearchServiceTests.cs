@@ -164,4 +164,70 @@ public class FlightSearchServiceTests
             x => x.GetLatestForTargetDateAsync(targetDateId, It.IsAny<CancellationToken>()),
             Times.Once);
     }
+
+    [Fact]
+    public async Task SearchAndSaveFlightAsync_PopulatesNavigationProperties()
+    {
+        // Arrange
+        var destination = new Destination
+        {
+            Id = 1,
+            AirportCode = "PMI",
+            Name = "Palma de Mallorca"
+        };
+
+        var targetDate = new TargetDate
+        {
+            Id = 1,
+            OutboundDate = DateTime.Now.AddDays(10),
+            ReturnDate = DateTime.Now.AddDays(14),
+            Name = "Test Weekend"
+        };
+
+        var searchResult = new FlightSearchResult
+        {
+            Success = true,
+            Flights = new[]
+            {
+                new FlightOption
+                {
+                    Price = 150m,
+                    Currency = "EUR",
+                    DepartureTime = DateTime.Now.AddDays(10),
+                    ArrivalTime = DateTime.Now.AddDays(10).AddHours(2),
+                    Airline = "Lufthansa",
+                    Stops = 0
+                }
+            }
+        };
+
+        _mockFlightProvider
+            .Setup(x => x.SearchFlightsAsync(It.IsAny<string>(), It.IsAny<string>(),
+                It.IsAny<DateTime>(), It.IsAny<DateTime>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(searchResult);
+
+        _mockDestinationRepo
+            .Setup(x => x.GetByAirportCodeAsync("PMI", It.IsAny<CancellationToken>()))
+            .ReturnsAsync(destination);
+
+        _mockTargetDateRepo
+            .Setup(x => x.GetByDatesAsync(It.IsAny<DateTime>(), It.IsAny<DateTime>(),
+                It.IsAny<CancellationToken>()))
+            .ReturnsAsync(targetDate);
+
+        // Act
+        var result = await _service.SearchAndSaveFlightAsync(
+            "FRA", "PMI",
+            DateTime.Now.AddDays(10),
+            DateTime.Now.AddDays(14));
+
+        // Assert - verify navigation properties are populated to avoid NullReferenceException in UI
+        Assert.NotNull(result);
+        Assert.NotNull(result.Destination);
+        Assert.NotNull(result.TargetDate);
+        Assert.Equal("Palma de Mallorca", result.Destination.Name);
+        Assert.Equal("Test Weekend", result.TargetDate.Name);
+        Assert.Equal(1, result.DestinationId);
+        Assert.Equal(1, result.TargetDateId);
+    }
 }
