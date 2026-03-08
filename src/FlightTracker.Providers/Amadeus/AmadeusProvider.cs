@@ -146,7 +146,13 @@ public class AmadeusProvider : IFlightProvider
             }
 
             // Convert response to FlightOptions
-            var flights = apiResponse.Data.Select(offer => ConvertToFlightOption(offer, apiResponse.Dictionaries)).ToList();
+            var flights = apiResponse.Data.Select(offer => ConvertToFlightOption(
+                offer, 
+                apiResponse.Dictionaries, 
+                originAirportCode, 
+                destinationAirportCode, 
+                outboundDate, 
+                returnDate)).ToList();
 
             _logger.LogInformation(
                 "Found {Count} flight(s) via Amadeus API. Cheapest: {Price} EUR",
@@ -243,7 +249,13 @@ public class AmadeusProvider : IFlightProvider
         }
     }
 
-    private FlightOption ConvertToFlightOption(FlightOffer offer, Dictionaries? dictionaries)
+    private FlightOption ConvertToFlightOption(
+        FlightOffer offer, 
+        Dictionaries? dictionaries,
+        string originAirportCode,
+        string destinationAirportCode,
+        DateTime outboundDate,
+        DateTime returnDate)
     {
         var price = decimal.TryParse(offer.Price?.Total, out var p) ? p : 0m;
         var currency = offer.Price?.Currency ?? "EUR";
@@ -271,6 +283,12 @@ public class AmadeusProvider : IFlightProvider
         // Calculate total stops (segments - 1)
         var stops = (firstItinerary?.Segments?.Count ?? 1) - 1;
 
+        // Build Skyscanner URL
+        // Format: https://www.skyscanner.com/transport/flights/{origin}/{destination}/{outbound-yymmdd}/{return-yymmdd}/
+        var outboundDateStr = outboundDate.ToString("yyMMdd");
+        var returnDateStr = returnDate.ToString("yyMMdd");
+        var skyscannerUrl = $"https://www.skyscanner.com/transport/flights/{originAirportCode.ToLower()}/{destinationAirportCode.ToLower()}/{outboundDateStr}/{returnDateStr}/";
+
         return new FlightOption
         {
             Price = price,
@@ -279,7 +297,7 @@ public class AmadeusProvider : IFlightProvider
             ArrivalTime = arrivalTime,
             Airline = airlineName,
             Stops = stops,
-            BookingUrl = $"https://www.google.com/travel/flights?q=flights%20from%20{firstSegment?.Departure?.IataCode}%20to%20{lastSegment?.Arrival?.IataCode}"
+            BookingUrl = skyscannerUrl
         };
     }
 
