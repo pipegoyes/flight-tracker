@@ -105,16 +105,45 @@ jobs:
 
       - name: Configure App Service settings
         run: |
-          az webapp config appsettings set \
-            --name ${{ steps.discover.outputs.webapp_name }} \
-            --resource-group ${{ steps.discover.outputs.resource_group }} \
-            --settings \
-              "Sentry__Dsn=${{ secrets.SENTRY_DSN }}" \
-              "FlightProvider__Type=${{ secrets.FLIGHT_PROVIDER_TYPE }}" \
-              "FlightProvider__ApiKey=${{ secrets.FLIGHT_PROVIDER_API_KEY }}" \
-              "FlightProvider__ApiSecret=${{ secrets.FLIGHT_PROVIDER_API_SECRET }}" \
-              "FlightProvider__ApiHost=${{ secrets.FLIGHT_PROVIDER_API_HOST }}" \
-              "FlightProvider__UseProduction=${{ secrets.FLIGHT_PROVIDER_USE_PRODUCTION }}"
+          # Only update settings if secrets are provided
+          # This prevents wiping out existing settings with empty values
+          SETTINGS_ARGS=""
+          
+          if [ -n "${{ secrets.SENTRY_DSN }}" ]; then
+            SETTINGS_ARGS="$SETTINGS_ARGS Sentry__Dsn=${{ secrets.SENTRY_DSN }}"
+          fi
+          
+          if [ -n "${{ secrets.FLIGHT_PROVIDER_TYPE }}" ]; then
+            SETTINGS_ARGS="$SETTINGS_ARGS FlightProvider__Type=${{ secrets.FLIGHT_PROVIDER_TYPE }}"
+          fi
+          
+          if [ -n "${{ secrets.FLIGHT_PROVIDER_API_KEY }}" ]; then
+            SETTINGS_ARGS="$SETTINGS_ARGS FlightProvider__ApiKey=${{ secrets.FLIGHT_PROVIDER_API_KEY }}"
+          fi
+          
+          if [ -n "${{ secrets.FLIGHT_PROVIDER_API_SECRET }}" ]; then
+            SETTINGS_ARGS="$SETTINGS_ARGS FlightProvider__ApiSecret=${{ secrets.FLIGHT_PROVIDER_API_SECRET }}"
+          fi
+          
+          if [ -n "${{ secrets.FLIGHT_PROVIDER_API_HOST }}" ]; then
+            SETTINGS_ARGS="$SETTINGS_ARGS FlightProvider__ApiHost=${{ secrets.FLIGHT_PROVIDER_API_HOST }}"
+          fi
+          
+          if [ -n "${{ secrets.FLIGHT_PROVIDER_USE_PRODUCTION }}" ]; then
+            SETTINGS_ARGS="$SETTINGS_ARGS FlightProvider__UseProduction=${{ secrets.FLIGHT_PROVIDER_USE_PRODUCTION }}"
+          fi
+          
+          # Only run if we have settings to update
+          if [ -n "$SETTINGS_ARGS" ]; then
+            echo "Updating app settings from secrets..."
+            az webapp config appsettings set \
+              --name ${{ steps.discover.outputs.webapp_name }} \
+              --resource-group ${{ steps.discover.outputs.resource_group }} \
+              --settings $SETTINGS_ARGS
+          else
+            echo "No secrets configured - skipping app settings update"
+            echo "App settings are managed by Terraform"
+          fi
 
       - name: Deploy to Azure Web App
         id: deploy
