@@ -7,6 +7,7 @@ using FlightTracker.Data.TableStorage;
 using FlightTracker.Data.TableStorage.Repositories;
 using FlightTracker.Web.Components;
 using FlightTracker.Web.Data;
+using FlightTracker.Web.Middleware;
 using FlightTracker.Web.Services;
 using Microsoft.EntityFrameworkCore;
 
@@ -28,6 +29,10 @@ builder.WebHost.UseSentry(options =>
 // Add services to the container.
 builder.Services.AddRazorComponents()
     .AddInteractiveServerComponents();
+
+// Add authentication and authorization for Easy Auth integration
+builder.Services.AddAuthentication();
+builder.Services.AddAuthorization();
 
 // Bind configuration
 builder.Services.Configure<AppConfig>(
@@ -176,6 +181,13 @@ if (!app.Environment.IsDevelopment())
 }
 
 app.UseHttpsRedirection();
+
+// Easy Auth middleware - populates HttpContext.User from Azure App Service authentication
+app.UseMiddleware<EasyAuthMiddleware>();
+
+// Authentication and authorization
+app.UseAuthentication();
+app.UseAuthorization();
 
 app.UseStaticFiles();
 app.UseAntiforgery();
