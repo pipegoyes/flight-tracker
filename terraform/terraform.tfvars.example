@@ -29,6 +29,11 @@ sentry_dsn = "https://1bd573b8c99620f98e60715ad367d054@o4510860611092480.ingest.
 # Flight Tracker Configuration
 flight_tracker_origin = "FRA"
 
+# Authentication Configuration
+# Enable Azure Easy Auth with Microsoft Account (personal or work)
+# When enabled, all access requires Microsoft account login
+enable_authentication = false
+
 # Flight Provider Configuration
 # Options: "Mock" (fake data), "BookingCom" (requires API key), "Skyscanner" (not implemented)
 flight_provider_type    = "Mock"
