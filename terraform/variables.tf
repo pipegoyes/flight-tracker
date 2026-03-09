@@ -115,6 +115,12 @@ variable "custom_domain" {
   default     = ""
 }
 
+variable "enable_authentication" {
+  description = "Enable Azure Easy Auth with Microsoft Account"
+  type        = bool
+  default     = false
+}
+
 variable "tags" {
   description = "Tags to apply to all resources"
   type        = map(string)

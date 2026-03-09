@@ -197,6 +197,30 @@ resource "azurerm_linux_web_app" "flight_tracker" {
     type = "SystemAssigned"
   }
 
+  # Authentication configuration (Easy Auth with Microsoft Account)
+  # Note: First time setup requires Azure CLI command to complete registration
+  # Run: az webapp auth microsoft update --resource-group <rg> --name <app-name> --client-id <generated-id> --enable true
+  auth_settings_v2 {
+    auth_enabled           = var.enable_authentication
+    require_authentication = var.enable_authentication
+    unauthenticated_action = var.enable_authentication ? "RedirectToLoginPage" : "AllowAnonymous"
+    
+    # Default provider when authentication is enabled
+    default_provider = var.enable_authentication ? "azureactivedirectory" : null
+    
+    # Login settings
+    login {
+      token_store_enabled                = true
+      preserve_url_fragments_for_logins  = false
+      
+      # Session cookie expires after 8 hours
+      cookie_expiration {
+        cookie_expiration_convention = "FixedTime"
+        cookie_expiration_time       = "08:00:00"
+      }
+    }
+  }
+
   tags = var.tags
 
   depends_on = [
