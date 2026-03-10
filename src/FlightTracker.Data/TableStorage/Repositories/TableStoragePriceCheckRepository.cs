@@ -11,13 +11,16 @@ public class TableStoragePriceCheckRepository : IPriceCheckRepository
 {
     private readonly TableClient _tableClient;
     private readonly TableStorageDestinationRepository _destinationRepo;
+    private readonly ITargetDateRepository _targetDateRepo;
 
     public TableStoragePriceCheckRepository(
         TableStorageContext context,
-        TableStorageDestinationRepository destinationRepo)
+        TableStorageDestinationRepository destinationRepo,
+        ITargetDateRepository targetDateRepo)
     {
         _tableClient = context.GetPriceChecksTable();
         _destinationRepo = destinationRepo;
+        _targetDateRepo = targetDateRepo;
     }
 
     public async Task<PriceCheck?> GetByIdAsync(int id, CancellationToken cancellationToken = default)
@@ -100,6 +103,9 @@ public class TableStoragePriceCheckRepository : IPriceCheckRepository
         var dest = await _destinationRepo.GetByIdAsync(destinationId, cancellationToken);
         if (dest == null) return null;
 
+        var targetDate = await _targetDateRepo.GetByIdAsync(targetDateId, cancellationToken);
+        if (targetDate == null) return null;
+
         var filter = $"PartitionKey eq '{targetDateId}' and DestinationCode eq '{dest.AirportCode}'";
         
         PriceCheckEntity? latest = null;
@@ -113,11 +119,15 @@ public class TableStoragePriceCheckRepository : IPriceCheckRepository
         
         var priceCheck = latest.ToDomain(destinationId);
         priceCheck.Destination = dest;
+        priceCheck.TargetDate = targetDate;
         return priceCheck;
     }
 
     public async Task<IEnumerable<PriceCheck>> GetLatestForTargetDateAsync(int targetDateId, CancellationToken cancellationToken = default)
     {
+        var targetDate = await _targetDateRepo.GetByIdAsync(targetDateId, cancellationToken);
+        if (targetDate == null) return Enumerable.Empty<PriceCheck>();
+
         var filter = $"PartitionKey eq '{targetDateId}'";
         
         var byDestination = new Dictionary<string, PriceCheckEntity>();
@@ -138,6 +148,7 @@ public class TableStoragePriceCheckRepository : IPriceCheckRepository
             {
                 var priceCheck = kvp.Value.ToDomain(dest.Id);
                 priceCheck.Destination = dest;
+                priceCheck.TargetDate = targetDate;
                 results.Add(priceCheck);
             }
         }
@@ -149,6 +160,9 @@ public class TableStoragePriceCheckRepository : IPriceCheckRepository
         var dest = await _destinationRepo.GetByIdAsync(destinationId, cancellationToken);
         if (dest == null) return Enumerable.Empty<PriceCheck>();
 
+        var targetDate = await _targetDateRepo.GetByIdAsync(targetDateId, cancellationToken);
+        if (targetDate == null) return Enumerable.Empty<PriceCheck>();
+
         var filter = $"PartitionKey eq '{targetDateId}' and DestinationCode eq '{dest.AirportCode}'";
         
         var results = new List<PriceCheck>();
@@ -158,6 +172,7 @@ public class TableStoragePriceCheckRepository : IPriceCheckRepository
             {
                 var priceCheck = entity.ToDomain(destinationId);
                 priceCheck.Destination = dest;
+                priceCheck.TargetDate = targetDate;
                 results.Add(priceCheck);
             }
         }
@@ -175,8 +190,12 @@ public class TableStoragePriceCheckRepository : IPriceCheckRepository
                 var dest = await _destinationRepo.GetByCodeAsync(entity.DestinationCode, cancellationToken);
                 if (dest != null)
                 {
+                    var targetDateId = int.Parse(entity.PartitionKey);
+                    var targetDate = await _targetDateRepo.GetByIdAsync(targetDateId, cancellationToken);
+                    
                     var priceCheck = entity.ToDomain(dest.Id);
                     priceCheck.Destination = dest;
+                    priceCheck.TargetDate = targetDate; // May be null if target date was deleted
                     results.Add(priceCheck);
                 }
             }
